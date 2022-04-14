@@ -165,31 +165,20 @@ void MainWindow::paintEvent(QPaintEvent *event)
     pero.setWidth(3);
     pero.setColor(Qt::green);
 
-    QRect mainRect     = ui->mainFrame->geometry();
-    QRect lidarRect    = ui->lidarFrame->geometry();
-    QRect skeletonRect = ui->skeletonFrame->geometry();
+    QRect mainRect   = ui->mainFrame->geometry();
+    QRect cameraRect = ui->cameraFrame->geometry();
 
     painter.drawRect(mainRect);
     painter.setBrush(Qt::white);
-    painter.drawRect(lidarRect);
+    painter.drawRect(cameraRect);
     painter.setBrush(Qt::white);
-    painter.drawRect(skeletonRect);
     painter.setBrush(Qt::black);
 
-    QPoint lidarTopLeft        = lidarRect.topLeft();
-    QPoint lidarBottomRight    = lidarRect.bottomRight();
-    QPoint skeletonTopLeft     = skeletonRect.topLeft();
-    QPoint skeletonBottomRight = skeletonRect.bottomRight();
-
-    int lidarWidth  = lidarBottomRight.x() - lidarTopLeft.x();
-    int lidarHeight = lidarBottomRight.y() - lidarTopLeft.y();
-
-    int skeletonWidth  = skeletonBottomRight.x() - skeletonTopLeft.x();
-    int skeletonHeight = skeletonBottomRight.y() - skeletonTopLeft.y();
+    int mainWidth  = mainRect.bottomRight().x() - mainRect.topLeft().x();
+    int mainHeight = mainRect.bottomRight().y() - mainRect.topLeft().y();
 
     // draw lidar integration
     painter.setPen(pero);
-    float q_dist[8] = {100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0};
 
     bool draw_robot = true;
     bool wallNear = false;
@@ -275,39 +264,40 @@ void MainWindow::paintEvent(QPaintEvent *event)
             }
         }
 
-        // classifying all quadrants occupied by barrier
-        if (D < 0.8 && D > 0.15)
-        {
-           int q = int(a)/45 % 8 +1;
-           if (q_dist[q - 1] > D)
-                q_dist[q - 1] = D;    // q is from 1-8, array indexing from 0-7
-        }
-
         // computing x and y for standalone lidar frame
-        int zooming = (int)(7000 / lidarWidth);
-        int dist = paintLaserData.Data[k].scanDistance / zooming;
-        int xp   = lidarBottomRight.x() - (lidarWidth  / 2 + dist * sin((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
-        int yp   = lidarBottomRight.y() - (lidarHeight / 2 + dist * cos((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
+        float zooming_x = 8000.0 / mainWidth;
+        float zooming_y = 8000.0 / mainHeight;
+        float dist_x = paintLaserData.Data[k].scanDistance / zooming_x;
+        float dist_y = paintLaserData.Data[k].scanDistance / zooming_y;
+        float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + dist_x * sin((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
+        float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + dist_y * cos((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
 
         if (draw_robot)
         {
-            int xp   = lidarBottomRight.x() - (lidarWidth  / 2 + 0.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
-            int yp   = lidarBottomRight.y() - (lidarHeight / 2 + 0.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
+            float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + 0.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
+            float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + 0.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
 
-            float xp_2 = xp + 0.0f;
-            float yp_2 = yp - 15.0f;
+            painter.setPen(QPen(Qt::green));
+            painter.drawEllipse(QPointF(xp, yp), 6.0 * (mainWidth/640.0), 6.0 * (mainHeight/480.0));
 
-            painter.setPen(QPen(Qt::blue));
+            float xp_2 = xp + 0.0f * (mainWidth/640.0);
+            float yp_2 = yp - 10.0f * (mainHeight/480.0);
             painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
-            painter.drawEllipse(QPoint(xp, yp), 6, 6);
+
+            xp -= 6.0 * (mainWidth/640.0);
+            xp_2 = xp + 12.0 * (mainWidth/640.0);
+            yp_2 = yp;
+            painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
+
             draw_robot = false;
         }
 
         // painting lidar points to standalone frame
-        if(xp < lidarBottomRight.x() && xp > lidarTopLeft.x() && yp < lidarBottomRight.y() && yp > lidarTopLeft.y())
+        if(xp < mainRect.bottomRight().x() && xp > mainRect.topLeft().x() &&
+           yp < mainRect.bottomRight().y() && yp > mainRect.topLeft().y())
         {
             // change color according to distance
-            painter.setPen(QColor(175, 175, 175));
+            painter.setPen(QColor(0, 175, 0));
             painter.drawEllipse(QPoint(xp, yp), 2, 2);
         }
     }
@@ -357,19 +347,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
     // draw main camera
     QImage imgIn = QImage((uchar*) robotPicture.data, robotPicture.cols, robotPicture.rows, robotPicture.step, QImage::Format_BGR888);
-    painter.drawImage(mainRect ,imgIn,imgIn.rect());
-
-    // skeleton drawing
-    painter.setPen(QColor(175,175,175));
-    for(int i = 0; i < 75; i++)
-    {
-        int xp = skeletonBottomRight.x() - skeletonWidth * kostricka.joints[i].x;
-        int yp = skeletonTopLeft.y() + skeletonHeight * kostricka.joints[i].y;
-
-        if(xp < skeletonBottomRight.x() && xp > skeletonTopLeft.x() && yp < skeletonBottomRight.y() && yp > skeletonTopLeft.y())
-            painter.drawEllipse(QPoint(xp, yp), 2, 2);
-
-    }
+    painter.drawImage(cameraRect ,imgIn,imgIn.rect());
 }
 
 void MainWindow::RobotSetTranslationSpeed(float speed)

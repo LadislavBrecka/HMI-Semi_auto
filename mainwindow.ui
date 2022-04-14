@@ -22,7 +22,7 @@
    </property>
    <layout class="QGridLayout" name="gridLayout_3" rowstretch="1" columnstretch="3,1">
     <item row="0" column="1">
-     <layout class="QGridLayout" name="gridLayout_2" rowstretch="1,1,0,0,0,0,0,0" columnstretch="0">
+     <layout class="QGridLayout" name="gridLayout_2" rowstretch="1,1,0,0,0,0,0,1" columnstretch="0" rowminimumheight="0,0,0,0,0,0,0,0">
       <property name="sizeConstraint">
        <enum>QLayout::SetDefaultConstraint</enum>
       </property>
@@ -33,11 +33,26 @@
        <number>15</number>
       </property>
       <item row="1" column="0">
-       <widget class="QFrame" name="skeletonFrame">
+       <widget class="QFrame" name="cameraFrame">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+          <horstretch>7</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="minimumSize">
          <size>
           <width>200</width>
           <height>200</height>
+         </size>
+        </property>
+        <property name="sizeIncrement">
+         <size>
+          <width>0</width>
+          <height>0</height>
          </size>
         </property>
         <property name="frameShape">
@@ -47,35 +62,6 @@
          <enum>QFrame::Raised</enum>
         </property>
        </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QFrame" name="lidarFrame">
-        <property name="minimumSize">
-         <size>
-          <width>200</width>
-          <height>200</height>
-         </size>
-        </property>
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <spacer name="verticalSpacer">
-        <property name="orientation">
-         <enum>Qt::Vertical</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>20</width>
-          <height>40</height>
-         </size>
-        </property>
-       </spacer>
       </item>
       <item row="7" column="0">
        <widget class="QPushButton" name="pushButton">
@@ -92,6 +78,32 @@
          <string>STOP</string>
         </property>
        </widget>
+      </item>
+      <item row="2" column="0">
+       <spacer name="verticalSpacer">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="0" column="0">
+       <spacer name="verticalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
       </item>
      </layout>
     </item>
