@@ -265,8 +265,8 @@ void MainWindow::paintEvent(QPaintEvent *event)
         }
 
         // computing x and y for standalone lidar frame
-        float zooming_x = 8000.0 / mainWidth;
-        float zooming_y = 8000.0 / mainHeight;
+        float zooming_x = 5000.0 / mainWidth;
+        float zooming_y = 5000.0 / mainHeight;
         float dist_x = paintLaserData.Data[k].scanDistance / zooming_x;
         float dist_y = paintLaserData.Data[k].scanDistance / zooming_y;
         float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + dist_x * sin((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
@@ -277,7 +277,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
             float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + 0.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
             float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + 0.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
 
-            painter.setPen(QPen(Qt::green));
+            painter.setPen(QPen(Qt::gray));
             painter.drawEllipse(QPointF(xp, yp), 6.0 * (mainWidth/640.0), 6.0 * (mainHeight/480.0));
 
             float xp_2 = xp + 0.0f * (mainWidth/640.0);
@@ -297,8 +297,8 @@ void MainWindow::paintEvent(QPaintEvent *event)
            yp < mainRect.bottomRight().y() && yp > mainRect.topLeft().y())
         {
             // change color according to distance
-            painter.setPen(QColor(0, 175, 0));
-            painter.drawEllipse(QPoint(xp, yp), 2, 2);
+            painter.setPen(QPen(Qt::gray));
+            painter.drawEllipse(QPointF(xp, yp), 2.0 * (mainWidth/640.0), 2.0 * (mainHeight/480.0));
         }
     }
 
