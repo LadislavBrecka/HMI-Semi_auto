@@ -193,12 +193,6 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
     bool draw_robot = true;
     bool wallNear = false;
-    int x1,x2,y1,y2;
-
-    float max_w = 25.0f;
-    float min_w = 4.0f;
-    float max_d = 0.7f;
-    float min_d = 0.15f;
     float warn_d = 0.35;
 
     for(int k=0;k<paintLaserData.numberOfScans;k++)
@@ -365,68 +359,6 @@ void MainWindow::paintEvent(QPaintEvent *event)
     QImage imgIn = QImage((uchar*) robotPicture.data, robotPicture.cols, robotPicture.rows, robotPicture.step, QImage::Format_BGR888);
     painter.drawImage(mainRect ,imgIn,imgIn.rect());
 
-    // 1. kvadrant - pred robotom
-    if (q_dist[0] != 100.0 && q_dist[7] != 100.0)
-    {
-       x1 = mainRect.topLeft().x()     + 12;
-       x2 = mainRect.bottomRight().x() - 9;
-       y1 = mainRect.topLeft().y()     + 8;
-       y2 = mainRect.topLeft().y()     + 8;
-
-       float d = q_dist[0] > q_dist[7] ? q_dist[7] : q_dist[0];
-       float dist_color = (((d - min_d) * max_w) / (max_d - min_d)) + min_w;
-
-       painter.setPen(QPen(Qt::red, max_w - dist_color));
-       painter.drawLine(QLine(x1, y1, x2, y2));
-    }
-
-    // 2. kvadrant - vlavo od robota
-    if (q_dist[0] != 100.0 || q_dist[1] != 100.0 || q_dist[2] != 100.0)
-    {
-        x1 = mainRect.topLeft().x()     + 7;
-        x2 = mainRect.topLeft().x()     + 7;
-        y1 = mainRect.topLeft().y()     + 12;
-        y2 = mainRect.bottomRight().y() - 8;
-
-        float d = min(q_dist[0], q_dist[1]);
-        d = min(d, q_dist[2]);
-        float dist_color = (((d - min_d) * max_w) / (max_d - min_d)) + min_w;
-
-        painter.setPen(QPen(Qt::red, max_w - dist_color));
-        painter.drawLine(QLine(x1, y1, x2, y2));
-    }
-
-    // 3. kvadrant - za robotom
-    if (q_dist[3] != 100.0 && q_dist[4] != 100.0)
-    {
-       x1 = mainRect.topLeft().x()     + 12;
-       x2 = mainRect.bottomRight().x() - 9;
-       y1 = mainRect.bottomRight().y() - 5;
-       y2 = mainRect.bottomRight().y() - 5;
-
-       float d = q_dist[3] > q_dist[4] ? q_dist[4] : q_dist[3];
-       float dist_color = (((d - min_d) * max_w) / (max_d - min_d)) + min_w;
-
-       painter.setPen(QPen(Qt::red, max_w - dist_color));
-       painter.drawLine(QLine(x1, y1, x2, y2));
-    }
-
-    // 4. kvadrant - vpravo od robota
-    if (q_dist[5] != 100.0 || q_dist[6] != 100.0 || q_dist[7] != 100.0)
-    {
-       x1 = mainRect.bottomRight().x() - 6;
-       x2 = mainRect.bottomRight().x() - 6;
-       y1 = mainRect.topLeft().y()     + 12;
-       y2 = mainRect.bottomRight().y() - 9;
-
-       float d = min(q_dist[5], q_dist[6]);
-       d = min(d, q_dist[7]);
-       float dist_color = (((d - min_d) * max_w) / (max_d - min_d)) + min_w;
-
-       painter.setPen(QPen(Qt::red, max_w - dist_color));
-       painter.drawLine(QLine(x1, y1, x2, y2));
-    }
-
     // skeleton drawing
     painter.setPen(QColor(175,175,175));
     for(int i = 0; i < 75; i++)
@@ -437,93 +369,6 @@ void MainWindow::paintEvent(QPaintEvent *event)
         if(xp < skeletonBottomRight.x() && xp > skeletonTopLeft.x() && yp < skeletonBottomRight.y() && yp > skeletonTopLeft.y())
             painter.drawEllipse(QPoint(xp, yp), 2, 2);
 
-    }
-
-    // priamka palec
-    float thumb_1_angle = RadToDegree( atan2( (kostricka.joints[4].y - kostricka.joints[1].y), (kostricka.joints[4].x - kostricka.joints[1].x)));
-    float thumb_2_angle = RadToDegree(atan2( (kostricka.joints[25].y - kostricka.joints[22].y), (kostricka.joints[25].x - kostricka.joints[22].x)));
-
-    // priamka ukazovak
-    float index_1_angle = RadToDegree(atan2( (kostricka.joints[8].y - kostricka.joints[5].y), (kostricka.joints[8].x - kostricka.joints[5].x)));
-    float index_2_angle = RadToDegree(atan2( (kostricka.joints[29].y - kostricka.joints[26].y), (kostricka.joints[29].x - kostricka.joints[26].x)));
-
-    // priamka prostrednik
-    float middle_1_angle = RadToDegree(atan2( (kostricka.joints[12].y - kostricka.joints[9].y), (kostricka.joints[12].x - kostricka.joints[9].x)));
-    float middle_2_angle = RadToDegree(atan2( (kostricka.joints[33].y - kostricka.joints[30].y), (kostricka.joints[33].x - kostricka.joints[30].x)));
-
-    // priamka prstennik
-    float ring_1_angle = RadToDegree(atan2( (kostricka.joints[16].y - kostricka.joints[13].y), (kostricka.joints[16].x - kostricka.joints[13].x)));
-    float ring_2_angle = RadToDegree(atan2( (kostricka.joints[37].y - kostricka.joints[34].y), (kostricka.joints[37].x - kostricka.joints[34].x)));
-
-    // priamka malicek
-    float pinky_1_angle = RadToDegree(atan2( (kostricka.joints[20].y - kostricka.joints[17].y), (kostricka.joints[20].x - kostricka.joints[17].x)));
-    float pinky_2_angle = RadToDegree(atan2( (kostricka.joints[41].y - kostricka.joints[38].y), (kostricka.joints[41].x - kostricka.joints[38].x)));
-
-    bool left_hand_fist = index_1_angle < 180 && index_1_angle > 0    &&
-                          middle_1_angle < 180 && middle_1_angle > 0  &&
-                          ring_1_angle < 180 && ring_1_angle > 0      &&
-                          pinky_1_angle < 180 && pinky_1_angle > 0    &&
-                          !(thumb_1_angle > -120 && thumb_1_angle < -60 && thumb_2_angle > -120 && thumb_2_angle < -60);
-
-    bool right_hand_fist = index_2_angle < 180 && index_2_angle > 0    &&
-                            middle_2_angle < 180 && middle_2_angle > 0  &&
-                            ring_2_angle < 180 && ring_2_angle > 0      &&
-                            pinky_2_angle < 180 && pinky_2_angle > 0    &&
-                            !(thumb_1_angle > -120 && thumb_1_angle < -60 && thumb_2_angle > -120 && thumb_2_angle < -60);;
-
-
-    bool no_left_hand = false;
-    bool no_right_hand = false;
-
-    bool left_thumb_up = thumb_1_angle > -120 && thumb_1_angle < -60;
-    bool right_thumb_up = thumb_2_angle > -120 && thumb_2_angle < -60;
-
-    bool left_index_up = index_1_angle > -120 && index_1_angle < -60;
-    bool right_index_up = index_2_angle > -120 && index_2_angle < -60;
-
-    bool left_hand_open = kostricka.joints[4].y < kostricka.joints[3].y &&
-                            kostricka.joints[8].y < kostricka.joints[7].y &&
-                            kostricka.joints[12].y < kostricka.joints[11].y &&
-                            kostricka.joints[16].y < kostricka.joints[15].y &&
-                            kostricka.joints[20].y < kostricka.joints[19].y  && !left_thumb_up;
-
-    bool right_hand_open = kostricka.joints[25].y < kostricka.joints[24].y &&
-                            kostricka.joints[29].y < kostricka.joints[28].y &&
-                            kostricka.joints[33].y < kostricka.joints[32].y &&
-                            kostricka.joints[37].y < kostricka.joints[36].y &&
-                            kostricka.joints[41].y < kostricka.joints[40].y && !right_thumb_up;
-
-    bool left_index_pointing = (index_1_angle > 160 && index_1_angle <= 160) || (index_1_angle < -160 && index_1_angle > -180);
-    bool right_index_pointing = (index_2_angle > -20 && index_2_angle < 0) || (index_2_angle < 20 && index_2_angle > 0);
-
-    // stop
-    if (left_hand_fist || right_hand_fist || no_left_hand || no_right_hand)
-    {
-        RobotSetTranslationSpeed(0.0f);
-    }
-
-    // dopredu
-    else if (left_thumb_up && right_thumb_up)
-    {
-        RobotSetTranslationSpeed(100.0f);
-    }
-
-    // dozadu
-    else if (left_index_up && right_index_up)
-    {
-        RobotSetTranslationSpeed(-100.0f);
-    }
-
-    // doprava
-    else if (left_thumb_up && left_index_pointing && right_hand_open)
-    {
-        RobotSetRotationSpeed(-PI/8);
-    }
-
-    // dolava
-    else if (right_thumb_up && right_index_pointing && left_hand_open)
-    {
-        RobotSetRotationSpeed(PI/8);
     }
 }
 
