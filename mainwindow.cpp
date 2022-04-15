@@ -117,7 +117,6 @@ void MainWindow::localrobot(TKobukiData &sens)
         Point actual(x, y);
         // ziskanie chyby polohy
         auto targetOffset = GetTargetOffset(actual, target);
-        std::cout << targetOffset.first << " : " << targetOffset.second << std::endl;
         // regulacia rotacie
         RegulatorRotation(targetOffset.second);
         // ak nerotujeme, regulujeme doprednu rychlost
@@ -295,8 +294,8 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
         if (draw_robot)
         {
-            float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + 0.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
-            float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + 0.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
+            float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + 1.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
+            float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + 1.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
 
             painter.setPen(QPen(Qt::gray));
             painter.drawEllipse(QPointF(xp, yp), 6.0 * (mainWidth/640.0), 6.0 * (mainHeight/480.0));
@@ -380,8 +379,8 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
         p.y() > mainRect.topLeft().y() && p.y() < mainRect.bottomRight().y() )
     {
         // convert to mainFrame coordinates
-        float tx = p.x() - mainRect.topLeft().x();
-        float ty = p.y() - mainRect.topLeft().y();
+        double tx = p.x() - mainRect.topLeft().x();
+        double ty = p.y() - mainRect.topLeft().y();
 
         // cast to 640x480
         tx = (tx * 640.0) / mainWidth;
@@ -399,32 +398,48 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
         tx /= 1000.0f;
         ty /= 1000.0f;
 
+        float theta = f_k - PI/2;
+
+        float ox = 0;
+        float oy = 0;
+
+        double new_x = cos(theta) * (tx-ox) - sin(theta) * (ty-oy) + ox;
+        double new_y = sin(theta) * (tx-ox) + cos(theta) * (ty-oy) + oy;
+
+        double target_world_x = x + new_x;
+        double target_world_y = y + new_y;
+
         // now tx is distance in x axis to point in meters
         // now ty is distance in y axis to point in meters
 
         // display
-        std::cout << "Clicked point is: x="<< tx << " [m], y=" << ty << "[m]" << std::endl;
+        std::cout << "Clicked point is: x="<< target_world_x << " [m], y="
+                  << target_world_y << "[m]" << std::endl;
 
-        fifoTargets.In(Point(tx, ty));
+        // add to queue
+        fifoTargets.In(Point(target_world_x, target_world_y));
+
+        // turn on navigation
         navigate = true;
     }
 }
 
 
 ///konstruktor aplikacie, nic co tu je nevymazavajte, ak potrebujete, mozete si tu pridat nejake inicializacne parametre
-MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    setMouseTracking(true);
 
     showCamera=false;
     showLidar=true;
     showSkeleton=false;
-    applyDelay=true;
+    applyDelay=false;
+
     dl=0;
     stopall=1;
     updateCameraPicture=0;
+
     ipaddress="127.0.0.1";
     std::function<void(void)> f =std::bind(&robotUDPVlakno, (void *)this);
     robotthreadHandle=std::thread(f);
@@ -432,98 +447,32 @@ MainWindow::MainWindow(QWidget *parent) :
     laserthreadHandle=std::thread(f2);
 
     std::function<void(void)> f3 =std::bind(&skeletonUDPVlakno, (void *)this);
-    skeletonthreadHandle=std::thread(f3);
+    skeletonthreadHandle=std::thread(f3);  
 
-    setMouseTracking(true);
-
+    // regulator setup
     P_distance = 500.0f;
     P_angle = 2.5f;
     speedDifferenceLimit = MAX_START_SPEED;
     speedLimit = MAX_SPEED_LIMIT;
 
+    // prevision values setup
     prevRotSpeed = rotSpeed = 0.0f;
     prevTransSpeed = transSpeed = 0.0f;
-
-
 
     //--ak by ste nahodou chceli konzolu do ktorej mozete vypisovat cez std::cout, odkomentujte nasledujuce dva riadky
    // AllocConsole();
    // freopen("CONOUT$", "w", stdout);
-
 
     QFuture<void> future = QtConcurrent::run([=]() {
         imageViewer();
         // Code in this block will run in another thread
     });
 
-
-
-        Imager.start();
-
+    Imager.start();
 }
+
+
 //--cokolvek za tymto vas teoreticky nemusi zaujimat, su tam len nejake skarede kody
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 MainWindow::~MainWindow()
 {
@@ -533,14 +482,6 @@ MainWindow::~MainWindow()
     skeletonthreadHandle.join();
     delete ui;
 }
-
-
-
-
-
-
-
-
 
 void MainWindow::robotprocess()
 {
@@ -552,6 +493,7 @@ void MainWindow::robotprocess()
     iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 #else
 #endif
+
     rob_slen = sizeof(las_si_other);
     if ((rob_s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
     {
@@ -623,9 +565,10 @@ void MainWindow::robotprocess()
                 newcommand.sens=sens;
                 //    memcpy(&newcommand.sens,&sens,sizeof(TKobukiData));
                 //        clock_gettime(CLOCK_REALTIME,&t);
-                newcommand.timestamp=std::chrono::steady_clock::now();;//(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
-                auto timestamp=std::chrono::steady_clock::now();;//(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
+                newcommand.timestamp = std::chrono::steady_clock::now();;//(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
+                auto timestamp = std::chrono::steady_clock::now();;//(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
                 sensorQuerry.push_back(newcommand);
+
                 for(int i=0;i<sensorQuerry.size();i++)
                 {
                     if(( std::chrono::duration_cast<std::chrono::nanoseconds>(timestampf-sensorQuerry[i].timestamp)).count()>(2.5*1000000000))
@@ -634,7 +577,6 @@ void MainWindow::robotprocess()
                         sensorQuerry.erase(sensorQuerry.begin()+i);
                         i--;
                         break;
-
                     }
                 }
 
@@ -645,12 +587,11 @@ void MainWindow::robotprocess()
                 localrobot(sens);
             }
         }
-
-
     }
 
     std::cout<<"koniec thread2"<<std::endl;
 }
+
 /// vravel som ze vas to nemusi zaujimat. tu nic nieje
 /// nosy litlle bastard
 void MainWindow::laserprocess()
@@ -671,7 +612,6 @@ void MainWindow::laserprocess()
     char las_broadcastene=1;
 #ifdef _WIN32
     DWORD timeout=100;
-
     setsockopt(las_s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof timeout);
     setsockopt(las_s,SOL_SOCKET,SO_BROADCAST,&las_broadcastene,sizeof(las_broadcastene));
 #else
@@ -729,15 +669,11 @@ void MainWindow::laserprocess()
                     lidarQuerry.erase(lidarQuerry.begin()+i);
                     i--;
                     break;
-
                 }
             }
-
         }
         else
         {
-
-
             returnValue=locallaser(measure);
             if(returnValue!=-1)
             {
@@ -751,7 +687,6 @@ void MainWindow::laserprocess()
 void MainWindow::sendRobotCommand(char command,double speed,int radius)
 {
     {
-
         std::vector<unsigned char> mess;
         switch(command)
         {
@@ -1196,7 +1131,11 @@ void MainWindow::EvaluateRegulation(double distance, double theta)
         fifoTargets.Pop();
 
         if (fifoTargets.GetPoints().empty())
+        {
+
             navigate = false;
+            std::cout << std::endl << "Point reached!" << std::endl;
+        }
     }
 }
 
