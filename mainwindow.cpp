@@ -60,6 +60,10 @@ void MainWindow::localrobot(TKobukiData &sens)
         total_l = 0.0f;
         total_r = 0.0f;
 
+        pa1 = 0.012;
+        pa2 = 0.04;
+        pd = 0.02f;
+
         initParam = false;
     }
 
@@ -104,6 +108,23 @@ void MainWindow::localrobot(TKobukiData &sens)
     f_k_prev = f_k;
     x_prev = x;
     y_prev = y;
+
+    // REGULATION
+    if (!fifoTargets.GetPoints().empty() && (navigate || 0))
+    {
+        // first in, first out -> dat mi prvy element zo zasobnika
+        Point target = fifoTargets.Out();
+        Point actual(x, y);
+        // ziskanie chyby polohy
+        auto targetOffset = GetTargetOffset(actual, target);
+        std::cout << targetOffset.first << " : " << targetOffset.second << std::endl;
+        // regulacia rotacie
+        RegulatorRotation(targetOffset.second);
+        // ak nerotujeme, regulujeme doprednu rychlost
+        RegulatorTranslation(targetOffset.first, targetOffset.second);
+        // vyhodnotenie, ci splname poziadavky polohy
+        EvaluateRegulation(targetOffset.first, targetOffset.second);
+    }
 }
 
 // funkcia local laser je naspracovanie dat z lasera(zapnutie dopravneho oneskorenia sposobi opozdenie dat oproti aktualnemu stavu robota)
@@ -165,8 +186,8 @@ void MainWindow::paintEvent(QPaintEvent *event)
     pero.setWidth(3);
     pero.setColor(Qt::green);
 
-    QRect mainRect   = ui->mainFrame->geometry();
-    QRect cameraRect = ui->cameraFrame->geometry();
+    mainRect   = ui->mainFrame->geometry();
+    cameraRect = ui->cameraFrame->geometry();
 
     painter.drawRect(mainRect);
     painter.setBrush(Qt::white);
@@ -174,8 +195,8 @@ void MainWindow::paintEvent(QPaintEvent *event)
     painter.setBrush(Qt::white);
     painter.setBrush(Qt::black);
 
-    int mainWidth  = mainRect.bottomRight().x() - mainRect.topLeft().x();
-    int mainHeight = mainRect.bottomRight().y() - mainRect.topLeft().y();
+    mainWidth  = mainRect.bottomRight().x() - mainRect.topLeft().x();
+    mainHeight = mainRect.bottomRight().y() - mainRect.topLeft().y();
 
     // draw lidar integration
     painter.setPen(pero);
@@ -350,38 +371,44 @@ void MainWindow::paintEvent(QPaintEvent *event)
     painter.drawImage(cameraRect ,imgIn,imgIn.rect());
 }
 
-void MainWindow::RobotSetTranslationSpeed(float speed)
-{
-    if (speed > 0.0)
-       direction = 1;
-    else if (speed < 0.0)
-        direction = 2;
-    else
-        direction = 0;
+// Implement in your widget
+void MainWindow::mousePressEvent(QMouseEvent *event){
 
-    std::vector<unsigned char> mess=robot.setTranslationSpeed(speed);
-    if (sendto(rob_s, (char*)mess.data(), sizeof(char)*mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
+    QPoint p = event->pos();
+
+    if (p.x() > mainRect.topLeft().x() && p.x() < mainRect.bottomRight().x() &&
+        p.y() > mainRect.topLeft().y() && p.y() < mainRect.bottomRight().y() )
     {
+        // convert to mainFrame coordinates
+        float tx = p.x() - mainRect.topLeft().x();
+        float ty = p.y() - mainRect.topLeft().y();
 
+        // cast to 640x480
+        tx = (tx * 640.0) / mainWidth;
+        ty = 480.0 - (ty * 480.0) / mainHeight;
+
+        // center point coordinates
+        tx -= 640.0/2.0;
+        ty -= 480.0/2.0;
+
+        // tx is distance in x axis to point in pixels
+        // ty is distance in y axis to point in pixels
+
+        tx = (tx * 5000.0f) / mainWidth;
+        ty = (ty * 5000.0f) / mainHeight;
+        tx /= 1000.0f;
+        ty /= 1000.0f;
+
+        // now tx is distance in x axis to point in meters
+        // now ty is distance in y axis to point in meters
+
+        // display
+        std::cout << "Clicked point is: x="<< tx << " [m], y=" << ty << "[m]" << std::endl;
+
+        fifoTargets.In(Point(tx, ty));
+        navigate = true;
     }
 }
-
-void MainWindow::RobotSetRotationSpeed(float speed)
-{
-    if (speed > 0.0)
-       direction = 3;
-    else if (speed < 0.0)
-        direction = 4;
-    else
-        direction = 0;
-
-    std::vector<unsigned char> mess=robot.setRotationSpeed(speed);
-    if (sendto(rob_s, (char*)mess.data(), sizeof(char)*mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
-    {
-
-    }
-}
-
 
 
 ///konstruktor aplikacie, nic co tu je nevymazavajte, ak potrebujete, mozete si tu pridat nejake inicializacne parametre
@@ -400,12 +427,24 @@ MainWindow::MainWindow(QWidget *parent) :
     updateCameraPicture=0;
     ipaddress="127.0.0.1";
     std::function<void(void)> f =std::bind(&robotUDPVlakno, (void *)this);
-    robotthreadHandle=std::move(std::thread(f));
+    robotthreadHandle=std::thread(f);
     std::function<void(void)> f2 =std::bind(&laserUDPVlakno, (void *)this);
-    laserthreadHandle=std::move(std::thread(f2));
+    laserthreadHandle=std::thread(f2);
 
     std::function<void(void)> f3 =std::bind(&skeletonUDPVlakno, (void *)this);
-    skeletonthreadHandle=std::move(std::thread(f3));
+    skeletonthreadHandle=std::thread(f3);
+
+    setMouseTracking(true);
+
+    P_distance = 500.0f;
+    P_angle = 2.5f;
+    speedDifferenceLimit = MAX_START_SPEED;
+    speedLimit = MAX_SPEED_LIMIT;
+
+    prevRotSpeed = rotSpeed = 0.0f;
+    prevTransSpeed = transSpeed = 0.0f;
+
+
 
     //--ak by ste nahodou chceli konzolu do ktorej mozete vypisovat cez std::cout, odkomentujte nasledujuce dva riadky
    // AllocConsole();
@@ -995,13 +1034,170 @@ void MainWindow::imageViewer()
     }
 }
 
-// 640 x 480 (collumns x rows)
-bool isValid(uchar* screen, int m, int n, int x, int y, int prevC, int newC)
+void MainWindow::RobotSetTranslationSpeed(float speed)
 {
-    if(x < 0 || x >= m || y < 0 || y >= n || screen[x*640 + y] != prevC
-       || screen[x*640 + y]== newC)
-        return false;
-    return true;
+    if (speed > 0.0)
+       direction = 1;
+    else if (speed < 0.0)
+        direction = 2;
+    else
+        direction = 0;
+
+    std::vector<unsigned char> mess=robot.setTranslationSpeed(speed);
+    if (sendto(rob_s, (char*)mess.data(), sizeof(char)*mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
+    {
+
+    }
+}
+
+void MainWindow::RobotSetRotationSpeed(float speed)
+{
+    if (speed > 0.0)
+       direction = 3;
+    else if (speed < 0.0)
+        direction = 4;
+    else
+        direction = 0;
+
+    std::vector<unsigned char> mess=robot.setRotationSpeed(speed);
+    if (sendto(rob_s, (char*)mess.data(), sizeof(char)*mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
+    {
+
+    }
+}
+
+std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target)
+{
+    float dx = target.x - actual.x;
+    float dy = target.y - actual.y;
+    double alfa;
+
+    // ak je zmena v osi y nulova
+    if (dy == 0.0f)
+    {
+        alfa = 0.0f;
+    }
+    //ak je zmena v osi x nulova
+    else if (dx == 0.0f)
+    {
+        alfa = PI/2.0f;
+    }
+    // ak ani jeden predosli pripad nenastal, je delenie bezpecne
+    else
+    {
+        alfa = atan(fabs(dy)/fabs(dx));
+    }
+
+    bool negativeX =  dx < 0.0f;
+    bool negativeY =  dy < 0.0f;
+
+    // umiestnenie uhla do spravneho kvadrantu -> theta e <0, 360>
+    // 2. kvadrant
+    if (negativeX && !negativeY)
+    {
+        alfa = PI - alfa;
+    }
+    // 3. kvadrant
+    else if (negativeX && negativeY)
+    {
+       alfa = alfa + PI;
+    }
+    // 4. kvadrant
+    else if (!negativeX && negativeY)
+    {
+       alfa = 2*PI - alfa;
+    }
+
+    float distance = sqrt(pow(dx, 2) + pow(dy, 2));
+    double thetaOffset = 0.0f;
+    if (f_k < alfa)
+    {
+        thetaOffset = alfa - f_k;
+        if (thetaOffset > PI)
+        {
+            thetaOffset = 2*PI - thetaOffset;
+            thetaOffset *= (-1);
+        }
+    }
+    else if (f_k > alfa)
+    {
+        thetaOffset = f_k - alfa;
+        if (thetaOffset <= PI)
+        {
+            thetaOffset *= (-1);
+        }
+        else if (thetaOffset > PI)
+        {
+            thetaOffset = 2*PI - thetaOffset;
+        }
+    }
+
+   return std::pair<double, double>(distance, thetaOffset);
+}
+
+void MainWindow::RegulatorRotation(double dTheta)
+{
+    // ak je uhol vacsi ako mrtve pasmo pa2, regulator reguluje uhol natocenia
+    if (fabs(dTheta) > pa2)
+    {
+        // P Regulator s rampou
+        float idealSpeed = P_angle * dTheta;
+        if (idealSpeed > prevRotSpeed + speedDifferenceLimit)
+            rotSpeed += speedDifferenceLimit;
+        else
+            rotSpeed = idealSpeed;
+    }
+
+    // ak je uhol mansie ako vnutorne mrtve pasmo pa1, ukoncujeme regulaciu uhla natocenia
+    else if (fabs(dTheta) < pa1)
+    {
+       rotSpeed = 0.0f;
+    }
+
+    if (rotSpeed > speedLimit)
+        rotSpeed = speedLimit;
+
+    RobotSetRotationSpeed(rotSpeed);
+    prevRotSpeed = rotSpeed;
+}
+
+void MainWindow::RegulatorTranslation(double distance, double dTheta)
+{
+    // ak je robot spravne natoceny a neprebieha rotacia, regulator reguluje doprednu rychlost
+    if (distance > pd && abs(dTheta) <= pa2)
+    {
+        float idealSpeed = P_distance * distance;
+
+        if (idealSpeed > prevTransSpeed + speedDifferenceLimit)
+            transSpeed += speedDifferenceLimit;
+        else
+            transSpeed = idealSpeed;
+
+        if (transSpeed > speedLimit)
+            transSpeed = speedLimit;
+
+        RobotSetTranslationSpeed(transSpeed);
+    }
+
+    prevTransSpeed = transSpeed;
+}
+
+void MainWindow::EvaluateRegulation(double distance, double theta)
+{
+    if (distance <= pd)
+    {
+        // dosiahnutie ciela
+        transSpeed = 0.0f;
+        rotSpeed   = 0.0f;
+
+        // tato funkcia nastavi 0 rychlost na obe kolesa
+        RobotSetTranslationSpeed(transSpeed);
+
+        fifoTargets.Pop();
+
+        if (fifoTargets.GetPoints().empty())
+            navigate = false;
+    }
 }
 
 double MainWindow::RadToDegree(double radians)
@@ -1012,4 +1208,19 @@ double MainWindow::RadToDegree(double radians)
 double MainWindow::DegreeToRad(double degrees)
 {
     return degrees * (PI/180);
+}
+
+void MainWindow::PrintTargetQueue()
+{
+    std::vector<Point> targets = fifoTargets.GetPoints();
+
+    std::string message;
+
+    if (!targets.empty())
+    {
+        for (auto v : targets)
+                message += " --  X: " + std::to_string(v.x) + ", Y:" + std::to_string(v.y) + " --  ";
+    }
+
+    std::cout << message << std::endl;
 }
