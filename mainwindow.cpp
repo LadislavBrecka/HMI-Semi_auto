@@ -413,14 +413,46 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
         // now ty is distance in y axis to point in meters
 
         // display
-        std::cout << "Clicked point is: x="<< target_world_x << " [m], y="
-                  << target_world_y << "[m]" << std::endl;
+//        std::cout << "Clicked point is: x="<< target_world_x << " [m], y="
+//                  << target_world_y << "[m]" << std::endl;
 
-        // add to queue
-        fifoTargets.In(Point(target_world_x, target_world_y));
+        // check with zone if point is reachable
+        Point target(target_world_x, target_world_y);
+        Point actual(x, y);
+        // ziskanie chyby polohy
+        auto targetOffset = GetTargetOffset(actual, target);
 
-        // turn on navigation
-        navigate = true;
+        bool unreachable = false;
+        for(int k=0;k<paintLaserData.numberOfScans;k++)
+        {
+            float D = paintLaserData.Data[k].scanDistance / 1000.0;
+            float a = 360.0 - paintLaserData.Data[k].scanAngle;
+            if (a > 360)    a -= 360;
+            if (a < 0)      a += 360;
+            float pointAngleZone = DegreeToRad(a) - targetOffset.second;
+
+            if (D > 0.005 && D < targetOffset.first && (pointAngleZone < PI/2 || pointAngleZone > (3/2)*PI) )
+            {
+                float dCrit = b / sin(pointAngleZone);
+                if (dCrit > D)
+                {
+                    unreachable = true;
+                    break;
+                }
+            }
+        }
+
+        if (unreachable)
+            std::cout << "Point is unreachable!" << std::endl;
+        else
+        {
+            std::cout << "Point is reachable!" << std::endl;
+            // add to queue
+            fifoTargets.In(Point(target_world_x, target_world_y));
+
+            // turn on navigation
+            navigate = true;
+        }
     }
 }
 
