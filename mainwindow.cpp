@@ -124,6 +124,32 @@ void MainWindow::localrobot(TKobukiData &sens)
         // vyhodnotenie, ci splname poziadavky polohy
         EvaluateRegulation(targetOffset.first, targetOffset.second);
     }
+
+    // CREATING MAP
+    if (!isRotating && map_mode)
+    {
+        for(int k=0;k<paintLaserData.numberOfScans/*360*/;k++)
+        {
+            double dist  = paintLaserData.Data[k].scanDistance;
+
+            if (dist > 150.0f && dist < 2500.0f)
+            {
+                double angle = paintLaserData.Data[k].scanAngle;
+
+                double angle_sum = f_k + DegreeToRad(360.0f - angle);
+
+                if (angle_sum >= 2*PI)
+                    angle_sum -= 2*PI;
+                else if (angle_sum < 0.0f)
+                    angle_sum += 2*PI;
+
+                double x_lidar = x + (dist / 1000.0f) * cos(angle_sum);
+                double y_lidar = y + (dist / 1000.0f) * sin(angle_sum);
+
+                map.setWall(Point(x_lidar, y_lidar));
+            }
+        }
+    }
 }
 
 // funkcia local laser je naspracovanie dat z lasera(zapnutie dopravneho oneskorenia sposobi opozdenie dat oproti aktualnemu stavu robota)
@@ -179,7 +205,7 @@ int MainWindow::autonomouslaser(LaserMeasurement &laserData)
 void MainWindow::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
-    painter.setBrush(Qt::black);
+    painter.setBrush(Qt::gray);
     QPen pero;
     pero.setStyle(Qt::SolidLine);
     pero.setWidth(3);
@@ -187,12 +213,17 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
     mainRect   = ui->mainFrame->geometry();
     cameraRect = ui->cameraFrame->geometry();
+    mapRect    = ui->mapFrame->geometry();
 
     painter.drawRect(mainRect);
     painter.setBrush(Qt::white);
     painter.drawRect(cameraRect);
-    painter.setBrush(Qt::white);
+
+    painter.setPen(QPen(Qt::black));
+    painter.drawRect(mapRect);
+
     painter.setBrush(Qt::black);
+
 
     mainWidth  = mainRect.bottomRight().x() - mainRect.topLeft().x();
     mainHeight = mainRect.bottomRight().y() - mainRect.topLeft().y();
@@ -297,7 +328,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
             float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + 1.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
             float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + 1.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
 
-            painter.setPen(QPen(Qt::gray));
+            painter.setPen(QPen(Qt::blue));
             painter.drawEllipse(QPointF(xp, yp), 6.0 * (mainWidth/640.0), 6.0 * (mainHeight/480.0));
 
             float xp_2 = xp + 0.0f * (mainWidth/640.0);
@@ -368,12 +399,36 @@ void MainWindow::paintEvent(QPaintEvent *event)
     // draw main camera
     QImage imgIn = QImage((uchar*) robotPicture.data, robotPicture.cols, robotPicture.rows, robotPicture.step, QImage::Format_BGR888);
     painter.drawImage(cameraRect ,imgIn,imgIn.rect());
+
+    // draw map
+    double mapRectWidth  = mapRect.bottomRight().x() - mapRect.topLeft().x();
+    double mapRectHeight = mapRect.bottomRight().y() - mapRect.topLeft().y();
+    if (map.filled)
+    {
+        for (int i = 0; i < MAP_HEIGHT; ++i)
+        {
+            for (int j = 0; j < MAP_WIDTH; ++j)
+            {
+                if (map.map[i][j] == 1)
+                {
+                    float point_x = mapRect.topLeft().x() + (j * mapRectWidth)  / MAP_WIDTH;
+                    float point_y = mapRect.topLeft().y() + (i * mapRectHeight) / MAP_HEIGHT;
+
+                    painter.drawEllipse(QPointF(point_x, point_y), 2.0 * (mapRectWidth/400.0), 2.0 * (mapRectHeight/400.0));
+
+                }
+            }
+        }
+    }
 }
 
 // Implement in your widget
 void MainWindow::mousePressEvent(QMouseEvent *event){
 
     QPoint p = event->pos();
+
+    mainWidth  = mainRect.bottomRight().x() - mainRect.topLeft().x();
+    mainHeight = mainRect.bottomRight().y() - mainRect.topLeft().y();
 
     if (p.x() > mainRect.topLeft().x() && p.x() < mainRect.bottomRight().x() &&
         p.y() > mainRect.topLeft().y() && p.y() < mainRect.bottomRight().y() )
@@ -393,8 +448,8 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
         // tx is distance in x axis to point in pixels
         // ty is distance in y axis to point in pixels
 
-        tx = (tx * 5000.0f) / mainWidth;
-        ty = (ty * 5000.0f) / mainHeight;
+        tx = (tx * 5000.0f) / 640.0;
+        ty = (ty * 5000.0f) / 480.0;
         tx /= 1000.0f;
         ty /= 1000.0f;
 
@@ -411,10 +466,6 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
 
         // now tx is distance in x axis to point in meters
         // now ty is distance in y axis to point in meters
-
-        // display
-//        std::cout << "Clicked point is: x="<< target_world_x << " [m], y="
-//                  << target_world_y << "[m]" << std::endl;
 
         // check with zone if point is reachable
         Point target(target_world_x, target_world_y);
@@ -1003,6 +1054,8 @@ void MainWindow::imageViewer()
 
 void MainWindow::RobotSetTranslationSpeed(float speed)
 {
+    isRotating = false;
+
     if (speed > 0.0)
        direction = 1;
     else if (speed < 0.0)
@@ -1019,6 +1072,9 @@ void MainWindow::RobotSetTranslationSpeed(float speed)
 
 void MainWindow::RobotSetRotationSpeed(float speed)
 {
+    if (speed != 0.0)
+        isRotating = true;
+
     if (speed > 0.0)
        direction = 3;
     else if (speed < 0.0)
@@ -1195,3 +1251,26 @@ void MainWindow::PrintTargetQueue()
 
     std::cout << message << std::endl;
 }
+
+void MainWindow::on_radioButton_clicked(bool checked)
+{
+    if (checked)
+    {
+        speedLimit = 150.0f;
+        speedDifferenceLimit = 25.0;
+        map_mode = true;
+    }
+    else
+    {
+        map_mode = false;
+        speedLimit = MAX_SPEED_LIMIT;
+        speedDifferenceLimit = MAX_START_SPEED;
+    }
+}
+
+
+void MainWindow::on_pushButton_2_clicked(bool checked)
+{
+    map.saveToFile();
+}
+

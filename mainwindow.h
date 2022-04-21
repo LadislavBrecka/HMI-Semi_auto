@@ -22,6 +22,7 @@
 #include<vector>
 #include<set>
 #include<array>
+#include<queue>
 #include<algorithm>
 #include<chrono>
 #include "CKobuki.h"
@@ -34,6 +35,7 @@
 #include "opencv2/imgcodecs.hpp"
 #include "rplidar.h"
 #include <QThread>
+#include <QTextStream>
 #include <QKeyEvent>
 #define ROBOT_VPRED 0x01
 #define ROBOT_VZAD 0x02
@@ -212,6 +214,107 @@ public:
     }
 };
 
+#define MAP_WIDTH 144
+#define MAP_HEIGHT 144
+#define MAP_STEP 12
+
+class Map
+{
+public:
+   int map[MAP_WIDTH][MAP_HEIGHT];
+   bool filled = false;
+
+public:
+    Map()
+    {
+        for(int i = 0; i < MAP_HEIGHT; i++)
+        {
+            for(int j = 0; j < MAP_WIDTH; j++)
+            {
+                map[i][j] = 0;
+            }
+        }
+
+        map[MAP_WIDTH/2][MAP_HEIGHT/2] = -1;
+    }
+
+    void setWall(Point lidar)
+    {
+        if (!filled) filled = true;
+        int x = round(lidar.x * MAP_STEP + MAP_WIDTH  / 2);
+        int y = MAP_HEIGHT - round(lidar.y * MAP_STEP + MAP_HEIGHT / 2);
+        map[y][x] = 1;
+    }
+
+
+    void saveToFile(std::string filename="map.txt")
+    {
+        QFile file(filename.c_str());
+        file.open(QIODevice::WriteOnly | QIODevice::Text);
+        QTextStream out(&file);
+
+        for (int i = 0; i < MAP_HEIGHT; ++i)
+        {
+            for (int j = 0; j < MAP_WIDTH; ++j)
+            {
+                if (map[i][j] == 1)
+                    out << "*";
+                else
+                    out << " ";
+            }
+            out << "\n";
+        }
+        std::cout << "Map saved to file " << filename << "!" << std::endl;
+        file.close();
+    }
+
+    void loadFromFile(std::string filename)
+    {
+        QFile file(filename.c_str());
+        file.open(QIODevice::ReadOnly | QIODevice::Text);
+        QTextStream in(&file);
+        char temp;
+        for (int i = 0; i < MAP_HEIGHT; ++i)
+        {
+            for (int j = 0; j < MAP_WIDTH; ++j)
+            {
+                in >> temp;
+                if (temp == '*')
+                    map[i][j] = 1;
+                else if (temp == ' ')
+                    map[i][j] = 0;
+            }
+            in >> temp;
+        }
+
+        std::cout << "Map load from file " << filename << "!" << std::endl;
+    }
+
+    void saveToFileRaw(std::string filename="map_raw.txt")
+    {
+        QFile file(filename.c_str());
+        file.open(QIODevice::WriteOnly | QIODevice::Text);
+        QTextStream out(&file);
+
+        for (int i = 0; i < MAP_HEIGHT; ++i)
+        {
+            for (int j = 0; j < MAP_WIDTH; ++j)
+            {
+                if (map[i][j] < 10)
+                    out << "  " << map[i][j] << " ";
+                else if (map[i][j] < 100)
+                    out << " " << map[i][j] << " ";
+                else
+                    out << map[i][j];
+            }
+            out << "\n";
+        }
+        std::cout << "Raw map saved to file " << filename << "!" << std::endl;
+        file.close();
+    }
+
+};
+
 class FifoQueue {
 
 private:
@@ -255,6 +358,7 @@ class MainWindow : public QMainWindow
 public:
     QRect mainRect;
     QRect cameraRect;
+    QRect mapRect;
 
     int mainWidth;
     int mainHeight;
@@ -278,6 +382,9 @@ public:
     // switche
     bool initParam = true;
     bool navigate = false;
+    bool map_mode = false;
+    bool isRotating = false;
+    bool maping_nav = false;
 
     // lokalizacia - stavove premenne
     double l_r, l_r_prev, l_l, l_l_prev, l_k;
@@ -297,6 +404,7 @@ public:
 
     // fifo queue pre target pozicie;
     FifoQueue fifoTargets;
+    Map map;
 
     bool rotationLock;
     int rotationDir;
@@ -406,6 +514,10 @@ private slots:
     void on_checkBox_2_clicked(bool checked);
     void on_checkBox_3_clicked(bool checked);
     void on_checkBox_4_clicked(bool checked);
+
+    void on_radioButton_clicked(bool checked);
+
+    void on_pushButton_2_clicked(bool checked);
 
 private:
     bool showCamera;
