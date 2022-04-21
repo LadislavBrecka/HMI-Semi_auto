@@ -60,9 +60,9 @@ void MainWindow::localrobot(TKobukiData &sens)
         total_l = 0.0f;
         total_r = 0.0f;
 
-        pa1 = 0.012;
-        pa2 = 0.04;
-        pd = 0.02f;
+        pa1 = 0.05;
+        pa2 = 0.15;
+        pd = 0.05f;
 
         initParam = false;
     }
@@ -150,6 +150,11 @@ void MainWindow::localrobot(TKobukiData &sens)
             }
         }
     }
+
+    if (l_r != l_l)
+        isRotating = true;
+    else
+        isRotating = false;
 }
 
 // funkcia local laser je naspracovanie dat z lasera(zapnutie dopravneho oneskorenia sposobi opozdenie dat oproti aktualnemu stavu robota)
@@ -420,6 +425,12 @@ void MainWindow::paintEvent(QPaintEvent *event)
             }
         }
     }
+
+    // draw text to lidar frame
+    painter.setPen(QPen(Qt::blue));
+    painter.setFont(QFont("Times", (mainWidth/70.0), QFont::Bold));
+    std::string message = "Speed is: " + std::to_string(actualSpeed);
+    painter.drawText(QPoint(mainWidth/40, mainHeight/20), message.c_str());
 }
 
 // Implement in your widget
@@ -517,7 +528,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     showCamera=false;
     showLidar=true;
     showSkeleton=false;
-    applyDelay=false;
+    applyDelay=true;
 
     dl=0;
     stopall=1;
@@ -533,8 +544,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     skeletonthreadHandle=std::thread(f3);  
 
     // regulator setup
-    P_distance = 500.0f;
-    P_angle = 2.5f;
+    P_distance = 200.0f;
+    P_angle = 0.25f;
     speedDifferenceLimit = MAX_START_SPEED;
     speedLimit = MAX_SPEED_LIMIT;
 
@@ -1054,7 +1065,7 @@ void MainWindow::imageViewer()
 
 void MainWindow::RobotSetTranslationSpeed(float speed)
 {
-    isRotating = false;
+//    isRotating = false;
 
     if (speed > 0.0)
        direction = 1;
@@ -1062,6 +1073,8 @@ void MainWindow::RobotSetTranslationSpeed(float speed)
         direction = 2;
     else
         direction = 0;
+
+    actualSpeed = speed;
 
     std::vector<unsigned char> mess=robot.setTranslationSpeed(speed);
     if (sendto(rob_s, (char*)mess.data(), sizeof(char)*mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
@@ -1072,8 +1085,8 @@ void MainWindow::RobotSetTranslationSpeed(float speed)
 
 void MainWindow::RobotSetRotationSpeed(float speed)
 {
-    if (speed != 0.0)
-        isRotating = true;
+//    if (speed != 0.0)
+//        isRotating = true;
 
     if (speed > 0.0)
        direction = 3;
