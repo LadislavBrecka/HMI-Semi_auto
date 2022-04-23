@@ -348,9 +348,13 @@ void MainWindow::paintEvent(QPaintEvent *event)
             draw_robot = false;
         }
 
+
         // painting lidar points to standalone frame
         if(xp < mainRect.bottomRight().x() && xp > mainRect.topLeft().x() &&
-           yp < mainRect.bottomRight().y() && yp > mainRect.topLeft().y())
+           yp < mainRect.bottomRight().y() && yp > mainRect.topLeft().y() &&
+           !((yp < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (xp < mainWidth/40 + (mainHeight/70.0) * 25))
+
+          )
         {
             // change color according to distance
             painter.setPen(QPen(Qt::gray));
@@ -358,48 +362,50 @@ void MainWindow::paintEvent(QPaintEvent *event)
         }
     }
 
-    switch(direction)
-    {
-        case 1:
-            cv::putText(robotPicture, //target image
-                    "FORWARD", //text
-                    cv::Point(robotPicture.cols/2.0f-20.0, 40.0f), //top-left position
-                    cv::FONT_HERSHEY_DUPLEX,
-                    0.6,
-                    CV_RGB(220, 220, 220), //font color
-                    2);
-            break;
+//    switch(direction)
+//    {
+//        case FORWARD:
+//            cv::putText(robotPicture, //target image
+//                    "FORWARD", //text
+//                    cv::Point(robotPicture.cols/2.0f-20.0, 40.0f), //top-left position
+//                    cv::FONT_HERSHEY_DUPLEX,
+//                    0.6,
+//                    CV_RGB(220, 220, 220), //font color
+//                    2);
+//            break;
 
-        case 2:
-            cv::putText(robotPicture, //target image
-                    "BACKWARD", //text
-                    cv::Point(robotPicture.cols/2.0f-20.0f, 40.0f), //top-left position
-                    cv::FONT_HERSHEY_DUPLEX,
-                    0.6,
-                    CV_RGB(220, 220, 220), //font color
-                    2);
-            break;
+//        case BACKWARD:
+//            cv::putText(robotPicture, //target image
+//                    "BACKWARD", //text
+//                    cv::Point(robotPicture.cols/2.0f-20.0f, 40.0f), //top-left position
+//                    cv::FONT_HERSHEY_DUPLEX,
+//                    0.6,
+//                    CV_RGB(220, 220, 220), //font color
+//                    2);
+//            break;
 
-        case 3:
-            cv::putText(robotPicture, //target image
-                    "LEFT", //text
-                    cv::Point(15.0f, 40.0f), //top-left position
-                    cv::FONT_HERSHEY_DUPLEX,
-                    0.6,
-                    CV_RGB(220, 220, 220), //font color
-                    2);
-            break;
+//        case LEFT:
+//            cv::putText(robotPicture, //target image
+//                    "LEFT", //text
+//                    cv::Point(15.0f, 40.0f), //top-left position
+//                    cv::FONT_HERSHEY_DUPLEX,
+//                    0.6,
+//                    CV_RGB(220, 220, 220), //font color
+//                    2);
+//            break;
 
-        case 4:
-            cv::putText(robotPicture, //target image
-                    "RIGHT", //text
-                    cv::Point(robotPicture.cols-70.0f, 40.0f), //top-left position
-                    cv::FONT_HERSHEY_DUPLEX,
-                    0.6,
-                    CV_RGB(220, 220, 220), //font color
-                    2);
-            break;
-    }
+//        case RIGHT:
+//            cv::putText(robotPicture, //target image
+//                    "RIGHT", //text
+//                    cv::Point(robotPicture.cols-70.0f, 40.0f), //top-left position
+//                    cv::FONT_HERSHEY_DUPLEX,
+//                    0.6,
+//                    CV_RGB(220, 220, 220), //font color
+//                    2);
+//            break;
+//        default:
+//            break;
+//    }
 
     // draw main camera
     QImage imgIn = QImage((uchar*) robotPicture.data, robotPicture.cols, robotPicture.rows, robotPicture.step, QImage::Format_BGR888);
@@ -419,7 +425,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
                     float point_x = mapRect.topLeft().x() + (j * mapRectWidth)  / MAP_WIDTH;
                     float point_y = mapRect.topLeft().y() + (i * mapRectHeight) / MAP_HEIGHT;
 
-                    painter.drawEllipse(QPointF(point_x, point_y), 2.0 * (mapRectWidth/400.0), 2.0 * (mapRectHeight/400.0));
+                    painter.drawEllipse(QPointF(point_x, point_y), 2.0 * (mapRectWidth/500.0), 2.0 * (mapRectHeight/500.0));
 
                 }
             }
@@ -428,9 +434,11 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
     // draw text to lidar frame
     painter.setPen(QPen(Qt::blue));
-    painter.setFont(QFont("Times", (mainWidth/70.0), QFont::Bold));
-    std::string message = "Speed is: " + std::to_string(actualSpeed);
-    painter.drawText(QPoint(mainWidth/40, mainHeight/20), message.c_str());
+    painter.setFont(QFont("Times", (mainHeight/70.0), QFont::Bold));
+    std::string message1 = "Trans. speed is: " + std::to_string(actualSpeed);
+    painter.drawText(QPoint(mainWidth/40, mainHeight/20), message1.c_str());
+    std::string message2 = "Command send to robot: " + std::string(DirectionToString(direction));
+    painter.drawText(QPoint(mainWidth/40, mainHeight/20 + mainHeight/35), message2.c_str());
 }
 
 // Implement in your widget
@@ -1065,19 +1073,14 @@ void MainWindow::imageViewer()
 
 void MainWindow::RobotSetTranslationSpeed(float speed)
 {
-//    isRotating = false;
-
-    if (speed > 0.0)
-       direction = 1;
-    else if (speed < 0.0)
-        direction = 2;
-    else
-        direction = 0;
+    if (speed > 0.0)        direction = FORWARD;
+    else if (speed < 0.0)   direction = BACKWARD;
+    else                    direction = STOP;
 
     actualSpeed = speed;
 
-    std::vector<unsigned char> mess=robot.setTranslationSpeed(speed);
-    if (sendto(rob_s, (char*)mess.data(), sizeof(char)*mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
+    std::vector<unsigned char> mess = robot.setTranslationSpeed(speed);
+    if (sendto(rob_s, (char*) mess.data(), sizeof(char) *mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
     {
 
     }
@@ -1085,18 +1088,12 @@ void MainWindow::RobotSetTranslationSpeed(float speed)
 
 void MainWindow::RobotSetRotationSpeed(float speed)
 {
-//    if (speed != 0.0)
-//        isRotating = true;
+    if (speed > 0.0)        direction = LEFT;
+    else if (speed < 0.0)   direction = RIGHT;
+    else                    direction = STOP;
 
-    if (speed > 0.0)
-       direction = 3;
-    else if (speed < 0.0)
-        direction = 4;
-    else
-        direction = 0;
-
-    std::vector<unsigned char> mess=robot.setRotationSpeed(speed);
-    if (sendto(rob_s, (char*)mess.data(), sizeof(char)*mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
+    std::vector<unsigned char> mess = robot.setRotationSpeed(speed);
+    if (sendto(rob_s, (char*) mess.data(), sizeof(char) *mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
     {
 
     }

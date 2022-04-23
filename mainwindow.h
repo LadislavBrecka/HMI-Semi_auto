@@ -351,6 +351,27 @@ public:
     }
 };
 
+enum Direction
+{
+    STOP=0,
+    FORWARD,
+    BACKWARD,
+    LEFT,
+    RIGHT
+};
+
+constexpr const char* DirectionToString(Direction e) noexcept
+{
+    switch (e)
+    {
+        case Direction::STOP: return "STOP";
+        case Direction::FORWARD: return "FORWARDF";
+        case Direction::BACKWARD: return "BACKWARD";
+        case Direction::LEFT: return "LEFT";
+        case Direction::RIGHT: return "RIGHT";
+    }
+}
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -363,7 +384,7 @@ public:
     int mainWidth;
     int mainHeight;
 
-    int direction = 0;
+    Direction direction = STOP;
 
     // utility functions
     std::pair<double, double> GetTargetOffset(Point actual, Point target);
