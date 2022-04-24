@@ -365,7 +365,7 @@ constexpr const char* DirectionToString(Direction e) noexcept
     switch (e)
     {
         case Direction::STOP: return "STOP";
-        case Direction::FORWARD: return "FORWARDF";
+        case Direction::FORWARD: return "FORWARD";
         case Direction::BACKWARD: return "BACKWARD";
         case Direction::LEFT: return "LEFT";
         case Direction::RIGHT: return "RIGHT";
@@ -391,7 +391,7 @@ public:
     double RadToDegree(double radians);
     double DegreeToRad(double degrees);
     void   PrintTargetQueue();
-    void mapping();
+    void   mapping();
 
     // robot control functions
     void RobotSetTranslationSpeed(float speed);
@@ -429,6 +429,8 @@ public:
     // fifo queue pre target pozicie;
     FifoQueue fifoTargets;
     Map map;
+
+    std::set<std::unique_ptr<Point>> trajectory;
 
     bool rotationLock;
     int rotationDir;

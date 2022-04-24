@@ -149,6 +149,8 @@ void MainWindow::localrobot(TKobukiData &sens)
                 map.setWall(Point(x_lidar, y_lidar));
             }
         }
+
+        trajectory.insert(std::make_unique<Point>(x, y));
     }
 
     if (l_r != l_l)
@@ -253,7 +255,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
         if ((a >=0 && a < 27) || (a > 333 && a < 360))
         {
-            if (D < 2.5f)
+            if (D < 2.5f && D > 0.15)
             {
                 float Y = 0.06;
                 float Z = D*cos(a * 3.14159 / 180.0);
@@ -362,51 +364,6 @@ void MainWindow::paintEvent(QPaintEvent *event)
         }
     }
 
-//    switch(direction)
-//    {
-//        case FORWARD:
-//            cv::putText(robotPicture, //target image
-//                    "FORWARD", //text
-//                    cv::Point(robotPicture.cols/2.0f-20.0, 40.0f), //top-left position
-//                    cv::FONT_HERSHEY_DUPLEX,
-//                    0.6,
-//                    CV_RGB(220, 220, 220), //font color
-//                    2);
-//            break;
-
-//        case BACKWARD:
-//            cv::putText(robotPicture, //target image
-//                    "BACKWARD", //text
-//                    cv::Point(robotPicture.cols/2.0f-20.0f, 40.0f), //top-left position
-//                    cv::FONT_HERSHEY_DUPLEX,
-//                    0.6,
-//                    CV_RGB(220, 220, 220), //font color
-//                    2);
-//            break;
-
-//        case LEFT:
-//            cv::putText(robotPicture, //target image
-//                    "LEFT", //text
-//                    cv::Point(15.0f, 40.0f), //top-left position
-//                    cv::FONT_HERSHEY_DUPLEX,
-//                    0.6,
-//                    CV_RGB(220, 220, 220), //font color
-//                    2);
-//            break;
-
-//        case RIGHT:
-//            cv::putText(robotPicture, //target image
-//                    "RIGHT", //text
-//                    cv::Point(robotPicture.cols-70.0f, 40.0f), //top-left position
-//                    cv::FONT_HERSHEY_DUPLEX,
-//                    0.6,
-//                    CV_RGB(220, 220, 220), //font color
-//                    2);
-//            break;
-//        default:
-//            break;
-//    }
-
     // draw main camera
     QImage imgIn = QImage((uchar*) robotPicture.data, robotPicture.cols, robotPicture.rows, robotPicture.step, QImage::Format_BGR888);
     painter.drawImage(cameraRect ,imgIn,imgIn.rect());
@@ -425,11 +382,25 @@ void MainWindow::paintEvent(QPaintEvent *event)
                     float point_x = mapRect.topLeft().x() + (j * mapRectWidth)  / MAP_WIDTH;
                     float point_y = mapRect.topLeft().y() + (i * mapRectHeight) / MAP_HEIGHT;
 
-                    painter.drawEllipse(QPointF(point_x, point_y), 2.0 * (mapRectWidth/500.0), 2.0 * (mapRectHeight/500.0));
+                    painter.drawEllipse(QPointF(point_x, point_y), 2 * (mapRectWidth/500), 2 * (mapRectHeight/500));
 
                 }
             }
         }
+    }
+
+    for (auto&& p : trajectory)
+    {
+        // make conversion from world coordinates to map frame coordinates
+        int traj_x = round(p->x * MAP_STEP + MAP_WIDTH  / 2);
+        int traj_y = MAP_HEIGHT - round(p->y * MAP_STEP + MAP_HEIGHT / 2);
+
+        float point_x = mapRect.topLeft().x() + (traj_x * mapRectWidth)  / MAP_WIDTH;
+        float point_y = mapRect.topLeft().y() + (traj_y * mapRectHeight) / MAP_HEIGHT;
+
+        // change color according to distance
+        painter.setPen(QPen(Qt::green));
+        painter.drawEllipse(QPointF(point_x, point_y), 1.4 * (mapRectWidth/500), 1.4 * (mapRectHeight/500));
     }
 
     // draw text to lidar frame
