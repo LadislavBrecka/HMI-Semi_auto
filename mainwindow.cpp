@@ -150,7 +150,9 @@ void MainWindow::localrobot(TKobukiData &sens)
             }
         }
 
-        trajectory.insert(std::make_unique<Point>(x, y));
+        float rounded_x = (int)(x * 100 + .5); rounded_x = (float)rounded_x / 100;
+        float rounded_y = (int)(y * 100 + .5); rounded_y = (float)rounded_y / 100;
+        trajectory.insert(std::make_unique<Point>(rounded_x, rounded_y));
     }
 
     if (l_r != l_l)
@@ -400,6 +402,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
         // change color according to distance
         painter.setPen(QPen(Qt::green));
+        painter.setBrush(QBrush(Qt::green));
         painter.drawEllipse(QPointF(point_x, point_y), 1.4 * (mapRectWidth/500), 1.4 * (mapRectHeight/500));
     }
 
