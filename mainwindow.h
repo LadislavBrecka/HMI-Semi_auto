@@ -455,7 +455,8 @@ public:
 private slots:
 
     void on_mapButton_clicked(bool checked);
-    void on_pushButton_2_clicked(bool checked);
+    void on_saveMap_clicked(bool checked);
+    void on_safeStop_clicked(bool checked);
 
 private:
     Ui::MainWindow *ui;

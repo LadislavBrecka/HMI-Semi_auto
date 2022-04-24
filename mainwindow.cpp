@@ -14,35 +14,40 @@
 #include <QCoreApplication>
 #include <QtConcurrent/QtConcurrent>
 
-void MainWindow::keyPressEvent(QKeyEvent *event)
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
-    if(event->key() == Qt::Key_W)
-    {
-        RobotSetTranslationSpeed(350.0f);
-    }
+    ui->setupUi(this);
+    setMouseTracking(true);
 
-    if(event->key() == Qt::Key_A)
-    {
-        RobotSetRotationSpeed(PI/4.0f);
-    }
+    showCamera=false;
+    showLidar=true;
+    showSkeleton=false;
+    applyDelay=true;
 
-    if(event->key() == Qt::Key_S)
-    {
-        RobotSetTranslationSpeed(0.0f);
-    }
+    dl=0;
+    stopall=1;
+    updateCameraPicture=0;
 
-    if(event->key() == Qt::Key_D)
-    {
-        RobotSetRotationSpeed(-PI/4.0f);
-    }
+    ipaddress="127.0.0.1";
+    std::function<void(void)> f =std::bind(&robotUDPVlakno, (void *)this);
+    robotthreadHandle=std::thread(f);
+    std::function<void(void)> f2 =std::bind(&laserUDPVlakno, (void *)this);
+    laserthreadHandle=std::thread(f2);
 
-    if(event->key() == Qt::Key_X)
-    {
-        RobotSetTranslationSpeed(-350.0f);
-    }
+    std::function<void(void)> f3 =std::bind(&skeletonUDPVlakno, (void *)this);
+    skeletonthreadHandle=std::thread(f3);
+
+    QFuture<void> future = QtConcurrent::run([=]() {
+        imageViewer();
+        // Code in this block will run in another thread
+    });
+
+    Imager.start();
 }
 
-//funkcia local robot je na priame riadenie robota, ktory je vo vasej blizskoti, viete si z dat ratat polohu atd (zapnutie dopravneho oneskorenia sposobi opozdenie dat oproti aktualnemu stavu robota)
+// funkcia local robot je na priame riadenie robota, ktory je vo vasej blizskoti,
+// viete si z dat ratat polohu atd (zapnutie dopravneho oneskorenia sposobi
+// opozdenie dat oproti aktualnemu stavu robota)
 void MainWindow::localrobot(TKobukiData &sens)
 { 
     // inicializacia pri prvom spusteni
@@ -171,56 +176,7 @@ void MainWindow::localrobot(TKobukiData &sens)
         isRotating = false;
 }
 
-// funkcia local laser je naspracovanie dat z lasera(zapnutie dopravneho oneskorenia sposobi opozdenie dat oproti aktualnemu stavu robota)
-int MainWindow::locallaser(LaserMeasurement &laserData)
-{
-
-    paintThisLidar(laserData);
-
-    ///PASTE YOUR CODE HERE
-    /// ****************
-    /// mozne hodnoty v return
-    /// ROBOT_VPRED
-    /// ROBOT_VZAD
-    /// ROBOT_VLAVO
-    /// ROBOT_VPRAVO
-    /// ROBOT_STOP
-    /// ROBOT_ARC
-    ///
-    /// ****************
-
-    return -1;
-}
-
-
-//--autonomousrobot simuluje slucku robota, ktora bezi priamo na robote
-// predstavte si to tak,ze ste naprogramovali napriklad polohovy regulator, uploadli ste ho do robota a tam sa to vykonava
-// dopravne oneskorenie nema vplyv na data
-void MainWindow::autonomousrobot(TKobukiData &sens)
-{
-
-}
-//--autonomouslaser simuluje spracovanie dat z robota, ktora bezi priamo na robote
-// predstavte si to tak,ze ste naprogramovali napriklad sposob obchadzania prekazky, uploadli ste ho do robota a tam sa to vykonava
-// dopravne oneskorenie nema vplyv na data
-int MainWindow::autonomouslaser(LaserMeasurement &laserData)
-{
-    ///PASTE YOUR CODE HERE
-    /// ****************
-    ///
-    ///
-    /// ****************
-    return -1;
-}
-
-///kamera nema svoju vlastnu funkciu ktora sa vola, ak chcete niekde pouzit obrazok, aktualny je v premennej
-/// robotPicture alebo ekvivalent AutonomousrobotPicture
-/// pozor na synchronizaciu, odporucam akonahle chcete robit nieco s obrazkom urobit si jeho lokalnu kopiu
-/// cv::Mat frameBuf; robotPicture.copyTo(frameBuf);
-
-
 //sposob kreslenia na obrazovku, tento event sa spusti vzdy ked sa bud zavola funkcia update() alebo operacny system si vyziada prekreslenie okna
-
 void MainWindow::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
@@ -269,7 +225,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
         {
             if (D < 2.5f && D > 0.15)
             {
-                float Y = 0.06;
+                float Y = 0.06f;
                 float Z = D*cos(a * 3.14159 / 180.0);
                 float X = D*sin(a * 3.14159 / 180.0);
 
@@ -362,7 +318,6 @@ void MainWindow::paintEvent(QPaintEvent *event)
             draw_robot = false;
         }
 
-
         // painting lidar points to standalone frame
         if(xp < mainRect.bottomRight().x() && xp > mainRect.topLeft().x() &&
            yp < mainRect.bottomRight().y() && yp > mainRect.topLeft().y() &&
@@ -423,6 +378,34 @@ void MainWindow::paintEvent(QPaintEvent *event)
     painter.drawText(QPoint(mainWidth/40, mainHeight/20), message1.c_str());
     std::string message2 = "Command send to robot: " + std::string(DirectionToString(direction));
     painter.drawText(QPoint(mainWidth/40, mainHeight/20 + mainHeight/35), message2.c_str());
+}
+
+void MainWindow::keyPressEvent(QKeyEvent *event)
+{
+    if(event->key() == Qt::Key_W)
+    {
+        RobotSetTranslationSpeed(350.0f);
+    }
+
+    if(event->key() == Qt::Key_A)
+    {
+        RobotSetRotationSpeed(PI/4.0f);
+    }
+
+    if(event->key() == Qt::Key_S)
+    {
+        RobotSetTranslationSpeed(0.0f);
+    }
+
+    if(event->key() == Qt::Key_D)
+    {
+        RobotSetRotationSpeed(-PI/4.0f);
+    }
+
+    if(event->key() == Qt::Key_X)
+    {
+        RobotSetTranslationSpeed(-350.0f);
+    }
 }
 
 // Implement in your widget
@@ -512,45 +495,253 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
     }
 }
 
-
-///konstruktor aplikacie, nic co tu je nevymazavajte, ak potrebujete, mozete si tu pridat nejake inicializacne parametre
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
+void MainWindow::RobotSetTranslationSpeed(float speed)
 {
-    ui->setupUi(this);
-    setMouseTracking(true);
+    if (speed > 0.0)        direction = FORWARD;
+    else if (speed < 0.0)   direction = BACKWARD;
+    else                    direction = STOP;
 
-    showCamera=false;
-    showLidar=true;
-    showSkeleton=false;
-    applyDelay=true;
+    actualSpeed = speed;
 
-    dl=0;
-    stopall=1;
-    updateCameraPicture=0;
+    std::vector<unsigned char> mess = robot.setTranslationSpeed(speed);
+    if (sendto(rob_s, (char*) mess.data(), sizeof(char) *mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
+    {
 
-    ipaddress="127.0.0.1";
-    std::function<void(void)> f =std::bind(&robotUDPVlakno, (void *)this);
-    robotthreadHandle=std::thread(f);
-    std::function<void(void)> f2 =std::bind(&laserUDPVlakno, (void *)this);
-    laserthreadHandle=std::thread(f2);
+    }
+}
 
-    std::function<void(void)> f3 =std::bind(&skeletonUDPVlakno, (void *)this);
-    skeletonthreadHandle=std::thread(f3);  
+void MainWindow::RobotSetRotationSpeed(float speed)
+{
+    if (speed > 0.0)        direction = LEFT;
+    else if (speed < 0.0)   direction = RIGHT;
+    else                    direction = STOP;
 
-    //--ak by ste nahodou chceli konzolu do ktorej mozete vypisovat cez std::cout, odkomentujte nasledujuce dva riadky
-   // AllocConsole();
-   // freopen("CONOUT$", "w", stdout);
+    std::vector<unsigned char> mess = robot.setRotationSpeed(speed);
+    if (sendto(rob_s, (char*) mess.data(), sizeof(char) *mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
+    {
 
-    QFuture<void> future = QtConcurrent::run([=]() {
-        imageViewer();
-        // Code in this block will run in another thread
-    });
+    }
+}
 
-    Imager.start();
+std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target)
+{
+    float dx = target.x - actual.x;
+    float dy = target.y - actual.y;
+    double alfa;
+
+    // ak je zmena v osi y nulova
+    if (dy == 0.0f)
+    {
+        alfa = 0.0f;
+    }
+    //ak je zmena v osi x nulova
+    else if (dx == 0.0f)
+    {
+        alfa = PI/2.0f;
+    }
+    // ak ani jeden predosli pripad nenastal, je delenie bezpecne
+    else
+    {
+        alfa = atan(fabs(dy)/fabs(dx));
+    }
+
+    bool negativeX =  dx < 0.0f;
+    bool negativeY =  dy < 0.0f;
+
+    // umiestnenie uhla do spravneho kvadrantu -> theta e <0, 360>
+    // 2. kvadrant
+    if (negativeX && !negativeY)
+    {
+        alfa = PI - alfa;
+    }
+    // 3. kvadrant
+    else if (negativeX && negativeY)
+    {
+       alfa = alfa + PI;
+    }
+    // 4. kvadrant
+    else if (!negativeX && negativeY)
+    {
+       alfa = 2*PI - alfa;
+    }
+
+    float distance = sqrt(pow(dx, 2) + pow(dy, 2));
+    double thetaOffset = 0.0f;
+    if (f_k < alfa)
+    {
+        thetaOffset = alfa - f_k;
+        if (thetaOffset > PI)
+        {
+            thetaOffset = 2*PI - thetaOffset;
+            thetaOffset *= (-1);
+        }
+    }
+    else if (f_k > alfa)
+    {
+        thetaOffset = f_k - alfa;
+        if (thetaOffset <= PI)
+        {
+            thetaOffset *= (-1);
+        }
+        else if (thetaOffset > PI)
+        {
+            thetaOffset = 2*PI - thetaOffset;
+        }
+    }
+
+   return std::pair<double, double>(distance, thetaOffset);
+}
+
+void MainWindow::RegulatorRotation(double dTheta)
+{
+    // ak je uhol vacsi ako mrtve pasmo pa2, regulator reguluje uhol natocenia
+    if (fabs(dTheta) > pa2)
+    {
+        // P Regulator s rampou
+        float idealSpeed = P_angle * dTheta;
+        if (idealSpeed > prevRotSpeed + speedDifferenceLimit)
+            rotSpeed += speedDifferenceLimit;
+        else
+            rotSpeed = idealSpeed;
+    }
+
+    // ak je uhol mansie ako vnutorne mrtve pasmo pa1, ukoncujeme regulaciu uhla natocenia
+    else if (fabs(dTheta) < pa1)
+    {
+       rotSpeed = 0.0f;
+    }
+
+    if (rotSpeed > speedLimit)
+        rotSpeed = speedLimit;
+
+    RobotSetRotationSpeed(rotSpeed);
+    prevRotSpeed = rotSpeed;
+}
+
+void MainWindow::RegulatorTranslation(double distance, double dTheta)
+{
+    // ak je robot spravne natoceny a neprebieha rotacia, regulator reguluje doprednu rychlost
+    if (distance > pd && abs(dTheta) <= pa2)
+    {
+        float idealSpeed = P_distance * distance;
+
+        if (idealSpeed > prevTransSpeed + speedDifferenceLimit)
+            transSpeed += speedDifferenceLimit;
+        else
+            transSpeed = idealSpeed;
+
+        if (transSpeed > speedLimit)
+            transSpeed = speedLimit;
+
+        RobotSetTranslationSpeed(transSpeed);
+    }
+
+    prevTransSpeed = transSpeed;
+}
+
+void MainWindow::EvaluateRegulation(double distance, double theta)
+{
+    if (distance <= pd)
+    {
+        // dosiahnutie ciela
+        transSpeed = 0.0f;
+        rotSpeed   = 0.0f;
+
+        // tato funkcia nastavi 0 rychlost na obe kolesa
+        RobotSetTranslationSpeed(transSpeed);
+
+        fifoTargets.Pop();
+
+        if (fifoTargets.GetPoints().empty())
+        {
+
+            navigate = false;
+            std::cout << std::endl << "Point reached!" << std::endl;
+        }
+    }
+}
+
+double MainWindow::RadToDegree(double radians)
+{
+    return radians * (180/PI);
+}
+
+double MainWindow::DegreeToRad(double degrees)
+{
+    return degrees * (PI/180);
+}
+
+void MainWindow::PrintTargetQueue()
+{
+    std::vector<Point> targets = fifoTargets.GetPoints();
+
+    std::string message;
+
+    if (!targets.empty())
+    {
+        for (auto v : targets)
+                message += " --  X: " + std::to_string(v.x) + ", Y:" + std::to_string(v.y) + " --  ";
+    }
+
+    std::cout << message << std::endl;
+}
+
+void MainWindow::on_mapButton_clicked(bool checked)
+{
+    if (checked)
+    {
+        speedLimit = 150.0f;
+        speedDifferenceLimit = 25.0;
+        map_mode = true;
+    }
+    else
+    {
+        map_mode = false;
+        speedLimit = MAX_SPEED_LIMIT;
+        speedDifferenceLimit = MAX_START_SPEED;
+    }
+}
+
+void MainWindow::on_saveMap_clicked(bool checked)
+{
+    map.saveToFile();
 }
 
 
 //--cokolvek za tymto vas teoreticky nemusi zaujimat, su tam len nejake skarede kody
+
+// funkcia local laser je naspracovanie dat z lasera(zapnutie dopravneho oneskorenia sposobi
+// opozdenie dat oproti aktualnemu stavu robota)
+int MainWindow::locallaser(LaserMeasurement &laserData)
+{
+    paintThisLidar(laserData);
+    return -1;
+}
+
+//--autonomousrobot simuluje slucku robota, ktora bezi priamo na robote
+// predstavte si to tak,ze ste naprogramovali napriklad polohovy regulator, uploadli ste ho do robota a tam sa to vykonava
+// dopravne oneskorenie nema vplyv na data
+void MainWindow::autonomousrobot(TKobukiData &sens)
+{
+
+}
+//--autonomouslaser simuluje spracovanie dat z robota, ktora bezi priamo na robote
+// predstavte si to tak,ze ste naprogramovali napriklad sposob obchadzania prekazky, uploadli ste ho do robota a tam sa to vykonava
+// dopravne oneskorenie nema vplyv na data
+int MainWindow::autonomouslaser(LaserMeasurement &laserData)
+{
+    ///PASTE YOUR CODE HERE
+    /// ****************
+    ///
+    ///
+    /// ****************
+    return -1;
+}
+
+///kamera nema svoju vlastnu funkciu ktora sa vola, ak chcete niekde pouzit obrazok, aktualny je v premennej
+/// robotPicture alebo ekvivalent AutonomousrobotPicture
+/// pozor na synchronizaciu, odporucam akonahle chcete robit nieco s obrazkom urobit si jeho lokalnu kopiu
+/// cv::Mat frameBuf; robotPicture.copyTo(frameBuf);
 
 MainWindow::~MainWindow()
 {
@@ -1015,215 +1206,8 @@ void MainWindow::imageViewer()
     }
 }
 
-void MainWindow::RobotSetTranslationSpeed(float speed)
+void MainWindow::on_safeStop_clicked(bool checked)
 {
-    if (speed > 0.0)        direction = FORWARD;
-    else if (speed < 0.0)   direction = BACKWARD;
-    else                    direction = STOP;
-
-    actualSpeed = speed;
-
-    std::vector<unsigned char> mess = robot.setTranslationSpeed(speed);
-    if (sendto(rob_s, (char*) mess.data(), sizeof(char) *mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
-    {
-
-    }
+    RobotSetTranslationSpeed(0.0f);
 }
 
-void MainWindow::RobotSetRotationSpeed(float speed)
-{
-    if (speed > 0.0)        direction = LEFT;
-    else if (speed < 0.0)   direction = RIGHT;
-    else                    direction = STOP;
-
-    std::vector<unsigned char> mess = robot.setRotationSpeed(speed);
-    if (sendto(rob_s, (char*) mess.data(), sizeof(char) *mess.size(), 0, (struct sockaddr*) &rob_si_posli, rob_slen) == -1)
-    {
-
-    }
-}
-
-std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target)
-{
-    float dx = target.x - actual.x;
-    float dy = target.y - actual.y;
-    double alfa;
-
-    // ak je zmena v osi y nulova
-    if (dy == 0.0f)
-    {
-        alfa = 0.0f;
-    }
-    //ak je zmena v osi x nulova
-    else if (dx == 0.0f)
-    {
-        alfa = PI/2.0f;
-    }
-    // ak ani jeden predosli pripad nenastal, je delenie bezpecne
-    else
-    {
-        alfa = atan(fabs(dy)/fabs(dx));
-    }
-
-    bool negativeX =  dx < 0.0f;
-    bool negativeY =  dy < 0.0f;
-
-    // umiestnenie uhla do spravneho kvadrantu -> theta e <0, 360>
-    // 2. kvadrant
-    if (negativeX && !negativeY)
-    {
-        alfa = PI - alfa;
-    }
-    // 3. kvadrant
-    else if (negativeX && negativeY)
-    {
-       alfa = alfa + PI;
-    }
-    // 4. kvadrant
-    else if (!negativeX && negativeY)
-    {
-       alfa = 2*PI - alfa;
-    }
-
-    float distance = sqrt(pow(dx, 2) + pow(dy, 2));
-    double thetaOffset = 0.0f;
-    if (f_k < alfa)
-    {
-        thetaOffset = alfa - f_k;
-        if (thetaOffset > PI)
-        {
-            thetaOffset = 2*PI - thetaOffset;
-            thetaOffset *= (-1);
-        }
-    }
-    else if (f_k > alfa)
-    {
-        thetaOffset = f_k - alfa;
-        if (thetaOffset <= PI)
-        {
-            thetaOffset *= (-1);
-        }
-        else if (thetaOffset > PI)
-        {
-            thetaOffset = 2*PI - thetaOffset;
-        }
-    }
-
-   return std::pair<double, double>(distance, thetaOffset);
-}
-
-void MainWindow::RegulatorRotation(double dTheta)
-{
-    // ak je uhol vacsi ako mrtve pasmo pa2, regulator reguluje uhol natocenia
-    if (fabs(dTheta) > pa2)
-    {
-        // P Regulator s rampou
-        float idealSpeed = P_angle * dTheta;
-        if (idealSpeed > prevRotSpeed + speedDifferenceLimit)
-            rotSpeed += speedDifferenceLimit;
-        else
-            rotSpeed = idealSpeed;
-    }
-
-    // ak je uhol mansie ako vnutorne mrtve pasmo pa1, ukoncujeme regulaciu uhla natocenia
-    else if (fabs(dTheta) < pa1)
-    {
-       rotSpeed = 0.0f;
-    }
-
-    if (rotSpeed > speedLimit)
-        rotSpeed = speedLimit;
-
-    RobotSetRotationSpeed(rotSpeed);
-    prevRotSpeed = rotSpeed;
-}
-
-void MainWindow::RegulatorTranslation(double distance, double dTheta)
-{
-    // ak je robot spravne natoceny a neprebieha rotacia, regulator reguluje doprednu rychlost
-    if (distance > pd && abs(dTheta) <= pa2)
-    {
-        float idealSpeed = P_distance * distance;
-
-        if (idealSpeed > prevTransSpeed + speedDifferenceLimit)
-            transSpeed += speedDifferenceLimit;
-        else
-            transSpeed = idealSpeed;
-
-        if (transSpeed > speedLimit)
-            transSpeed = speedLimit;
-
-        RobotSetTranslationSpeed(transSpeed);
-    }
-
-    prevTransSpeed = transSpeed;
-}
-
-void MainWindow::EvaluateRegulation(double distance, double theta)
-{
-    if (distance <= pd)
-    {
-        // dosiahnutie ciela
-        transSpeed = 0.0f;
-        rotSpeed   = 0.0f;
-
-        // tato funkcia nastavi 0 rychlost na obe kolesa
-        RobotSetTranslationSpeed(transSpeed);
-
-        fifoTargets.Pop();
-
-        if (fifoTargets.GetPoints().empty())
-        {
-
-            navigate = false;
-            std::cout << std::endl << "Point reached!" << std::endl;
-        }
-    }
-}
-
-double MainWindow::RadToDegree(double radians)
-{
-    return radians * (180/PI);
-}
-
-double MainWindow::DegreeToRad(double degrees)
-{
-    return degrees * (PI/180);
-}
-
-void MainWindow::PrintTargetQueue()
-{
-    std::vector<Point> targets = fifoTargets.GetPoints();
-
-    std::string message;
-
-    if (!targets.empty())
-    {
-        for (auto v : targets)
-                message += " --  X: " + std::to_string(v.x) + ", Y:" + std::to_string(v.y) + " --  ";
-    }
-
-    std::cout << message << std::endl;
-}
-
-void MainWindow::on_mapButton_clicked(bool checked)
-{
-    if (checked)
-    {
-        speedLimit = 150.0f;
-        speedDifferenceLimit = 25.0;
-        map_mode = true;
-    }
-    else
-    {
-        map_mode = false;
-        speedLimit = MAX_SPEED_LIMIT;
-        speedDifferenceLimit = MAX_START_SPEED;
-    }
-}
-
-
-void MainWindow::on_pushButton_2_clicked(bool checked)
-{
-    map.saveToFile();
-}

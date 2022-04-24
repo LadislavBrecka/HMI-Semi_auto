@@ -101,7 +101,7 @@
          </widget>
         </item>
         <item row="1" column="0">
-         <widget class="QPushButton" name="pushButton_2">
+         <widget class="QPushButton" name="saveMap">
           <property name="maximumSize">
            <size>
             <width>100</width>
@@ -129,7 +129,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pushButton">
+       <widget class="QPushButton" name="safeStop">
         <property name="minimumSize">
          <size>
           <width>0</width>
