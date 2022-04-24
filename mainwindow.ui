@@ -20,7 +20,7 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QGridLayout" name="gridLayout_3" rowstretch="1" columnstretch="3,1,0">
+   <layout class="QGridLayout" name="gridLayout_3" rowstretch="1" columnstretch="3,1">
     <item row="0" column="0">
      <widget class="QFrame" name="mainFrame">
       <property name="minimumSize">
@@ -88,7 +88,7 @@
          <number>15</number>
         </property>
         <item row="0" column="0">
-         <widget class="QRadioButton" name="radioButton">
+         <widget class="QRadioButton" name="mapButton">
           <property name="layoutDirection">
            <enum>Qt::LeftToRight</enum>
           </property>

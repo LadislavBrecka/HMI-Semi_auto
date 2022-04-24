@@ -2,7 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-
 #ifdef _WIN32
     #include<windows.h>
 #else
@@ -13,18 +12,17 @@
     #include<unistd.h>
     #include<sys/socket.h>
 #endif
-
-#include<iostream>
-#include<sys/types.h>
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include<vector>
-#include<set>
-#include<array>
-#include<queue>
-#include<algorithm>
-#include<chrono>
+#include <iostream>
+#include <sys/types.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <vector>
+#include <set>
+#include <array>
+#include <queue>
+#include <algorithm>
+#include <chrono>
 #include "CKobuki.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -46,85 +44,6 @@
 
 #define MAX_SPEED_LIMIT 400
 #define MAX_START_SPEED 50
-
-static const char *klby[]={{"left_wrist"},{"left_thumb_cmc"},{"left_thumb_mcp"},{"left_thumb_ip"},{"left_thumb_tip"},{"left_index_cmc"},{"left_index_mcp"},{"left_index_ip"},{"left_index_tip"},{"left_middle_cmc"},{"left_middle_mcp"},{"left_middle_ip"},{"left_middle_tip"},{"left_ring_cmc"},{"left_ring_mcp"},{"left_ring_ip"},{"left_ringy_tip"},{"left_pinky_cmc"},{"left_pink_mcp"},{"left_pink_ip"},{"left_pink_tip"},{"right_wrist"},{"right_thumb_cmc"},{"right_thumb_mcp"},{"right_thumb_ip"},{"right_thumb_tip"},{"right_index_cmc"},{"right_index_mcp"},{"right_index_ip"},{"right_index_tip"},{"right_middle_cmc"},{"right_middle_mcp"},{"right_middle_ip"},{"right_middle_tip"},{"right_ring_cmc"},{"right_ring_mcp"},{"right_ring_ip"},{"right_ringy_tip"},{"right_pinky_cmc"},{"right_pink_mcp"},{"right_pink_ip"},{"right_pink_tip"},{"nose"},{"left_eye_in"},{"left_eye"},{"left_eye_out"},{"right_eye_in"},{"right_eye"},{"right_eye_out"},{"left_ear"},{"right_ear"},{"mounth_left"},{"mounth_right"},{"left_shoulder"},{"right_shoulder"},{"left_elbow"},{"right_elbow"},{"left_wrist"},{"right_wrist"},{"left_pinky"},{"right_pinky"},{"left_index"},{"right_index"},{"left_thumb"},{"right_thumb"},{"left_hip"},{"right_hip"},{"left_knee"},{"right_knee"},{"left_ankle"},{"right_ankle"},{"left_heel"},{"righ_heel"},{"left+foot_index"},{"right_foot_index"}};
-enum jointnames
-{
-   left_wrist,
-   left_thumb_cmc,
-   left_thumb_mcp,
-   left_thumb_ip,
-   left_thumb_tip,
-   left_index_cmc,
-   left_index_mcp,
-   left_index_ip,
-   left_index_tip,
-   left_middle_cmc,
-   left_middle_mcp,
-   left_middle_ip,
-   left_middle_tip,
-   left_ring_cmc,
-   left_ring_mcp,
-   left_ring_ip,
-   left_ringy_tip,
-   left_pinky_cmc,
-   left_pink_mcp,
-   left_pink_ip,
-   left_pink_tip,
-   right_wrist,
-   right_thumb_cmc,
-   right_thumb_mcp,
-   right_thumb_ip,
-   right_thumb_tip,
-   right_index_cmc,
-   right_index_mcp,
-   right_index_ip,
-   right_index_tip,
-   right_middle_cmc,
-   right_middle_mcp,
-   right_middle_ip,
-   right_middle_tip,
-   right_ring_cmc,
-   right_ring_mcp,
-   right_ring_ip,
-   right_ringy_tip,
-   right_pinky_cmc,
-   right_pink_mcp,
-   right_pink_ip,
-   right_pink_tip,
-   nose,left_eye_in,
-   left_eye,
-   left_eye_out,
-   right_eye_in,
-   right_eye,
-   right_eye_out,
-   left_ear,
-   right_ear,
-   mounth_left,
-   mounth_right,
-   left_shoulder,
-   right_shoulder,
-   left_elbow,
-   right_elbow,
-   left_wrist_glob,
-   right_wrist_glob,
-   left_pinky,
-   right_pinky,
-   left_index,
-   right_index,
-   left_thumb,
-   right_thumb,
-   left_hip,
-   right_hip,
-   left_knee,
-   right_knee,
-   left_ankle,
-   right_ankle,
-   left_heel,
-   righ_heel,
-   left_foot_index,
-   right_foot_index
-};
 
 typedef struct
 {
@@ -172,7 +91,6 @@ typedef struct
     std::chrono::steady_clock::time_point timestamp;
     LaserMeasurement data;
 } LidarVector;
-
 
 typedef struct
 {
@@ -369,6 +287,7 @@ constexpr const char* DirectionToString(Direction e) noexcept
         case Direction::BACKWARD: return "BACKWARD";
         case Direction::LEFT: return "LEFT";
         case Direction::RIGHT: return "RIGHT";
+        default: return "NOT DEFINED";
     }
 }
 
@@ -386,14 +305,14 @@ public:
 
     Direction direction = STOP;
 
-    // utility functions
+    // utility funkcie
     std::pair<double, double> GetTargetOffset(Point actual, Point target);
     double RadToDegree(double radians);
     double DegreeToRad(double degrees);
     void   PrintTargetQueue();
     void   mapping();
 
-    // robot control functions
+    // kontrolne funkcie
     void RobotSetTranslationSpeed(float speed);
     void RobotSetRotationSpeed(float speed);
     void RegulatorRotation(double dTheta);
@@ -407,42 +326,39 @@ public:
     bool isRotating = false;
     bool maping_nav = false;
 
+    // signalizacie
+    bool rotationLock;
+    int rotationDir;
+
     // lokalizacia - stavove premenne
     double l_r, l_r_prev, l_l, l_l_prev, l_k;
     double x, x_prev, y, y_prev;
     double f_k, f_k_prev, d_alfa;
     unsigned int enc_l_prev, enc_r_prev;
     double total_l, total_r;
-    long double tickToMeter = 0.000085292090497737556558; // [m/tick]
-    long double b = 0.23; // wheelbase distance in meters, from kobuki manual https://yujinrobot.github.io/kobuki/doxygen/enAppendixProtocolSpecification.html
 
-    // actual translation speed send to robot
-    double actualSpeed;
+    // konstanty
+    long const double tickToMeter = 0.000085292090497737556558; // [m/tick]
+    long const double b = 0.23; // wheelbase distance in meters
 
-    // hodnoty mrtvych pasiem
-    float pa1, pa2;
-    // dead zone pre porovnanie s nulou
-    double epsilon;
-    // mrtve pasmo pre distance
-    double pd;
+    double actualSpeed; // aktualna rychlost poslana do robota
+    float pa1, pa2;     // hodnoty mrtvych pasiem
+    double epsilon;     // dead zone pre porovnanie s nulou
+    double pd;          // mrtve pasmo pre distance
 
-    // fifo queue pre target pozicie;
-    FifoQueue fifoTargets;
-    Map map;
+    std::set<std::unique_ptr<Point>> trajectory;    // kontainer trajektorii
+    FifoQueue fifoTargets;                          // fifo queue pre target pozicie;
+    Map map;                                        // mapa
 
-    std::set<std::unique_ptr<Point>> trajectory;
-
-    bool rotationLock;
-    int rotationDir;
-
+    // regulator - parametre
     float P_distance;
     float P_angle;
 
-    float prevRotSpeed, rotSpeed;
-    float prevTransSpeed, transSpeed;
-
     float speedDifferenceLimit;
     float speedLimit;
+
+    float prevRotSpeed, rotSpeed;
+    float prevTransSpeed, transSpeed;
 
     double pixelToMeter_x;
     double pixelToMeter_y;
@@ -452,14 +368,19 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-    bool naviguj;
+    // premenne demo programu
+    int dl;
     double zX;
     double zY;
-    double toleranciaUhla;
-    int dl;
+    bool naviguj;
     int stopall;
+    int robotthreadID;              // id vlakna
+    double toleranciaUhla;
     std::thread robotthreadHandle;
-    int robotthreadID;  // id vlakna
+
+    int updateLaserPicture;
+    int updateCameraPicture;
+    int updateSkeletonPicture;
 
     static void *robotUDPVlakno(void *param)
     {
@@ -467,21 +388,19 @@ public:
         return 0;
     }
 
-    std::thread laserthreadHandle;
     int laserthreadID;  // id vlakna
+    std::thread laserthreadHandle;
 
     static void *laserUDPVlakno(void *param)
     {
         ((MainWindow*)param)->laserprocess();
-
         return 0;
     }
 
-    std::thread skeletonthreadHandle;
     int skeletonthreadID;  // id vlakna
+    std::thread skeletonthreadHandle;
     static void *skeletonUDPVlakno(void *param)
     {
-        std::cout<<"startujem ci co"<<std::endl;
         ((MainWindow*)param)->skeletonprocess();
         return 0;
     }
@@ -498,34 +417,33 @@ public:
     void skeletonprocess();
     void localrobot(TKobukiData &sens);
     void autonomousrobot(TKobukiData &sens);
-
-    int locallaser(LaserMeasurement &laserData);
-    int autonomouslaser(LaserMeasurement &laserData);
-
     void paintThisLidar(LaserMeasurement &laserData);
-    LaserMeasurement paintLaserData;
-    int updateLaserPicture;
-    int updateCameraPicture;
-    int updateSkeletonPicture;
-    struct sockaddr_in las_si_me, las_si_other,las_si_posli;
-    int las_s,  las_recv_len;
-    struct sockaddr_in ske_si_me, ske_si_other,ske_si_posli;
-    int ske_s,  ske_recv_len;
-    struct sockaddr_in rob_si_me, rob_si_other,rob_si_posli;
-    int rob_s,  rob_recv_len;
+    int  locallaser(LaserMeasurement &laserData);
+    int  autonomouslaser(LaserMeasurement &laserData);
 
-    #ifdef _WIN32
-        int rob_slen;
-        int las_slen;
-        int ske_slen;
-    #else
-         unsigned int rob_slen;
-         unsigned int las_slen;
-         unsigned int ske_slen;
-    #endif
+    LaserMeasurement paintLaserData;
+
+    int las_s,  las_recv_len;
+    struct sockaddr_in las_si_me, las_si_other,las_si_posli;
+
+    int ske_s,  ske_recv_len;
+    struct sockaddr_in ske_si_me, ske_si_other,ske_si_posli;
+
+    int rob_s,  rob_recv_len;
+    struct sockaddr_in rob_si_me, rob_si_other,rob_si_posli;
+
+#ifdef _WIN32
+    int rob_slen;
+    int las_slen;
+    int ske_slen;
+#else
+     unsigned int rob_slen;
+     unsigned int las_slen;
+     unsigned int ske_slen;
+#endif
+    QTimer *timer;
     CKobuki robot;
     TKobukiData sens;
-    QTimer *timer;
     std::vector<RobotData> sensorQuerry;
     std::vector<LidarVector> lidarQuerry;
     std::vector<CameraVector> cameraQuerry;
@@ -536,23 +454,17 @@ public:
 
 private slots:
 
-    void on_pushButton_9_clicked();
-    void on_checkBox_2_clicked(bool checked);
-    void on_checkBox_3_clicked(bool checked);
-    void on_checkBox_4_clicked(bool checked);
-
-    void on_radioButton_clicked(bool checked);
-
+    void on_mapButton_clicked(bool checked);
     void on_pushButton_2_clicked(bool checked);
 
 private:
+    Ui::MainWindow *ui;
     bool showCamera;
     bool showLidar;
     bool showSkeleton;
     bool applyDelay;
-    Ui::MainWindow *ui;
-    void paintEvent(QPaintEvent *event);// Q_DECL_OVERRIDE;
-    void keyPressEvent(QKeyEvent* event);
+    void paintEvent(QPaintEvent *event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 };
 
 #endif // MAINWINDOW_H

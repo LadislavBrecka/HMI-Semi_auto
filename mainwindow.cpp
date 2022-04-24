@@ -60,9 +60,19 @@ void MainWindow::localrobot(TKobukiData &sens)
         total_l = 0.0f;
         total_r = 0.0f;
 
-        pa1 = 0.05;
-        pa2 = 0.15;
-        pd = 0.05f;
+        pa1 = 0.06;
+        pa2 = 0.12;
+        pd = 0.035f;
+
+        // regulator setup
+        P_distance = 200.0f;
+        P_angle = 0.25f;
+        speedDifferenceLimit = MAX_START_SPEED;
+        speedLimit = MAX_SPEED_LIMIT;
+
+        // prevision values setup
+        prevRotSpeed = rotSpeed = 0.0f;
+        prevTransSpeed = transSpeed = 0.0f;
 
         initParam = false;
     }
@@ -486,6 +496,8 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
             }
         }
 
+        std::cout << "Point is: [" << target_world_x << ", " << target_world_y << "]. " << std::endl;
+
         if (unreachable)
             std::cout << "Point is unreachable!" << std::endl;
         else
@@ -524,16 +536,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     std::function<void(void)> f3 =std::bind(&skeletonUDPVlakno, (void *)this);
     skeletonthreadHandle=std::thread(f3);  
-
-    // regulator setup
-    P_distance = 200.0f;
-    P_angle = 0.25f;
-    speedDifferenceLimit = MAX_START_SPEED;
-    speedLimit = MAX_SPEED_LIMIT;
-
-    // prevision values setup
-    prevRotSpeed = rotSpeed = 0.0f;
-    prevTransSpeed = transSpeed = 0.0f;
 
     //--ak by ste nahodou chceli konzolu do ktorej mozete vypisovat cez std::cout, odkomentujte nasledujuce dva riadky
    // AllocConsole();
@@ -895,21 +897,6 @@ void MainWindow::paintThisLidar(LaserMeasurement &laserData)
     update();
 }
 
-void MainWindow::on_pushButton_9_clicked()//left
-{
-    CommandVector help;
-    help.command.commandType=2;
-    help.command.actualAngle=0;
-    help.command.actualDist=0;
-    help.command.desiredAngle=20;
-    help.command.desiredDist=0;
-    struct timespec t;
-
-    //   clock_gettime(CLOCK_REALTIME,&t);
-    help.timestamp=std::chrono::steady_clock::now();//(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
-    AutonomousCommandQuerry.push_back(help);
-}
-
 void MainWindow::skeletonprocess()
 {
 
@@ -972,23 +959,6 @@ void MainWindow::skeletonprocess()
         }
     }
     std::cout<<"koniec thread"<<std::endl;
-}
-
-void MainWindow::on_checkBox_2_clicked(bool checked)
-{
-    showLidar=checked;
-}
-
-
-void MainWindow::on_checkBox_3_clicked(bool checked)
-{
-    showCamera=checked;
-}
-
-
-void MainWindow::on_checkBox_4_clicked(bool checked)
-{
-    showSkeleton=checked;
 }
 
 void MainWindow::imageViewer()
@@ -1236,7 +1206,7 @@ void MainWindow::PrintTargetQueue()
     std::cout << message << std::endl;
 }
 
-void MainWindow::on_radioButton_clicked(bool checked)
+void MainWindow::on_mapButton_clicked(bool checked)
 {
     if (checked)
     {
@@ -1257,4 +1227,3 @@ void MainWindow::on_pushButton_2_clicked(bool checked)
 {
     map.saveToFile();
 }
-
