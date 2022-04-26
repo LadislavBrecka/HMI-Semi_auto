@@ -303,8 +303,14 @@ public:
     int mainWidth;
     int mainHeight;
 
+    int width_offset = 0;
+    int height_offset = 0;
+
     int mapWidth;
     int mapHeight;
+
+    Point mainBaseSize = Point(732.0,539.0);
+    Point mapBaseSize = Point(242.0, 127.0);
 
     Direction direction = STOP;
 
@@ -328,6 +334,9 @@ public:
     bool map_mode = true;
     bool traj_mode = true;
     bool isRotating = false;
+    bool unreachable = false;
+
+    int count = 20;
 
     // signalizacie
     bool rotationLock;
@@ -348,6 +357,11 @@ public:
     float pa1, pa2;     // hodnoty mrtvych pasiem
     double epsilon;     // dead zone pre porovnanie s nulou
     double pd;          // mrtve pasmo pre distance
+
+    int column_start = 1000;
+    int row_start    = 1000;
+    int column_end   = 0;
+    int row_end      = 0;
 
     std::set<std::unique_ptr<Point>> trajectory;    // kontainer trajektorii
     FifoQueue fifoTargets;                          // fifo queue pre target pozicie;
@@ -469,7 +483,6 @@ private:
     bool applyDelay;
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent* event) override;
-    void resizeEvent(QResizeEvent* event) override;
 };
 
 #endif // MAINWINDOW_H

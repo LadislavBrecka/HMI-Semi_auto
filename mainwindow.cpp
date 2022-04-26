@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     showCamera=false;
     showLidar=true;
     showSkeleton=false;
-    applyDelay=false;
+    applyDelay=true;
 
     dl=0;
     stopall=1;
@@ -178,6 +178,11 @@ void MainWindow::localrobot(TKobukiData &sens)
 //sposob kreslenia na obrazovku, tento event sa spusti vzdy ked sa bud zavola funkcia update() alebo operacny system si vyziada prekreslenie okna
 void MainWindow::paintEvent(QPaintEvent *event)
 {
+    // counter setup for timing NOT REACHABLE text
+    if (count < 20)
+        count++;
+
+    // setting up variables
     QPainter painter(this);
     painter.setBrush(Qt::gray);
     QPen pero;
@@ -204,27 +209,44 @@ void MainWindow::paintEvent(QPaintEvent *event)
     mapWidth  = mapRect.bottomRight().x() - mapRect.topLeft().x();
     mapHeight = mapRect.bottomRight().y() - mapRect.topLeft().y();
 
-    Point mainBaseSize(732,539);
-    // draw lidar integration
-    painter.setPen(pero);
+    // computing done for securing same aspect ratio of main frame
+    if (mainWidth > mainHeight)
+    {
+        width_offset = (mainWidth - mainHeight) / 2.0f;
+        height_offset = 0;
+        mainWidth = mainHeight;
 
+    }
+    else if (mainWidth < mainHeight)
+    {
+        height_offset = (mainHeight - mainWidth) / 2.0f;
+        width_offset = 0;
+        mainHeight = mainWidth;
+    }
+
+
+    // working with lidar data
+    painter.setPen(pero);
     bool draw_robot = true;
     bool wallNear = false;
     float warn_d = 0.35;
 
+    // loop over all points of lidar
     for(int k=0;k<paintLaserData.numberOfScans;k++)
     {
-        // computing x and y of lidar points in camera space
         float f = 628.036;
         float D = paintLaserData.Data[k].scanDistance / 1000.0;
         float a = 360.0 - paintLaserData.Data[k].scanAngle;
         if (a > 360)    a -= 360;
         if (a < 0)      a += 360;
 
+        // change color according to distance
         float dist_color = ((D - 0.20) * 200.0 / (2.5 - 0.20)) + 55.0;
 
+        // looking only in field of view
         if ((a >=0 && a < 27) || (a > 333 && a < 360))
         {
+            // and point with these distances
             if (D < 2.5f && D > 0.15)
             {
                 float Y = 0.06f;
@@ -234,65 +256,68 @@ void MainWindow::paintEvent(QPaintEvent *event)
                 int x_obr = (robotPicture.cols  / 2 - (f * X) / Z);
                 int y_obr = (robotPicture.rows / 2 + (f * Y) / Z);
 
+                // check if points are not out of bounds
                 if (x_obr >= 640 || y_obr >= 480 || x_obr < 0 || y_obr < 0) continue;
 
-                // change color according to distance
+                // floodfill walls of main camera according to lidar points
                 if (!robotPicture.empty())
                     cv::floodFill(robotPicture, cv::Point(x_obr, y_obr), cv::Scalar(dist_color, dist_color, 255.0), 0, cv::Scalar(15, 15, 15), cv::Scalar(25, 25, 25));
 
+                // warning message, if point is too near
                 if (D < warn_d && !wallNear)
                 {
-                    cv::putText(robotPicture, //target image
-                            "WALL", //text
-                            cv::Point(x_obr, robotPicture.rows / 2), //top-left position
+                    cv::putText(robotPicture,
+                            "WALL",
+                            cv::Point(x_obr, robotPicture.rows / 2),
                             cv::FONT_HERSHEY_DUPLEX,
                             1.0,
-                            CV_RGB(255, 0, 0), //font color
+                            CV_RGB(255, 0, 0),
                             2);
                     wallNear = true;
                 }
             }
         }
 
+        // different warning messages, if point is not in field of view
         if (D < warn_d && D > 0.1 && !wallNear)
         {
             if (a <= 120)
             {
-                cv::putText(robotPicture, //target image
+                cv::putText(robotPicture,
                         "!!", //text
-                        cv::Point(15, robotPicture.rows / 2), //top-left position
+                        cv::Point(15, robotPicture.rows / 2),
                         cv::FONT_HERSHEY_DUPLEX,
                         1.0,
-                        CV_RGB(255, 0, 0), //font color
+                        CV_RGB(255, 0, 0),
                         2);
                 wallNear = true;
             }
             if (a >120 && a<210)
             {
-                cv::putText(robotPicture, //target image
-                        "!!", //text
-                        cv::Point(robotPicture.cols/2.0f, robotPicture.rows - 25), //top-left position
+                cv::putText(robotPicture,
+                        "!!",
+                        cv::Point(robotPicture.cols/2.0f, robotPicture.rows - 25),
                         cv::FONT_HERSHEY_DUPLEX,
                         1.0,
-                        CV_RGB(255, 0, 0), //font color
+                        CV_RGB(255, 0, 0),
                         2);
                 wallNear = true;
             }
 
             if (a >= 210)
             {
-                cv::putText(robotPicture, //target image
-                        "!!", //text
-                        cv::Point(robotPicture.cols-50, robotPicture.rows / 2), //top-left position
+                cv::putText(robotPicture,
+                        "!!",
+                        cv::Point(robotPicture.cols-50, robotPicture.rows / 2),
                         cv::FONT_HERSHEY_DUPLEX,
                         1.0,
-                        CV_RGB(255, 0, 0), //font color
+                        CV_RGB(255, 0, 0),
                         2);
                 wallNear = true;
             }
         }
 
-        // computing x and y for standalone lidar frame
+        // computing screen coordinates for lidar points for lidar frame
         float zooming_x = 5000.0 / mapWidth;
         float zooming_y = 5000.0 / mapHeight;
         float dist_x = paintLaserData.Data[k].scanDistance / zooming_x;
@@ -300,44 +325,43 @@ void MainWindow::paintEvent(QPaintEvent *event)
         float xp   = mapRect.bottomRight().x() - (mapWidth  / 2.0 + dist_x * sin((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
         float yp   = mapRect.bottomRight().y() - (mapHeight / 2.0 + dist_y * cos((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
 
+        // drawing robot in lidar frame
         if (draw_robot)
         {
             float xp   = mapRect.bottomRight().x() - (mapWidth  / 2.0 + 1.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
             float yp   = mapRect.bottomRight().y() - (mapHeight / 2.0 + 1.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
 
+            // drawing circle as robot
             painter.setPen(QPen(Qt::blue));
             painter.drawEllipse(QPointF(xp, yp), 6.0 * (mapWidth/640.0), 6.0 * (mapHeight/480.0));
 
-            float xp_2 = xp + 0.0f * (mapWidth/640.0);
-            float yp_2 = yp - 10.0f * (mapHeight/480.0);
+            // drawing robot direction as set of lines
+            float xp_2 = xp + 0.0f * (mapWidth/640.0); float yp_2 = yp - 10.0f * (mapHeight/480.0);
+            xp -= 6.0 * (mapWidth/640.0); xp_2 = xp + 12.0 * (mapHeight/640.0); yp_2 = yp;
             painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
-
-            xp -= 6.0 * (mapWidth/640.0);
-            xp_2 = xp + 12.0 * (mapHeight/640.0);
-            yp_2 = yp;
             painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
-
             draw_robot = false;
         }
 
-        // painting lidar points to standalone frame
+        // finally drawing lidar points if they are in bounds of lidar frame
         if(xp < mapRect.bottomRight().x() && xp > mapRect.topLeft().x() &&
            yp < mapRect.bottomRight().y() && yp > mapRect.topLeft().y())
         {
-            // change color according to distance
             painter.setPen(QPen(Qt::gray));
             painter.drawEllipse(QPointF(xp, yp), 2.0 * (mapWidth/640.0), 2.0 * (mapHeight/480.0));
         }
     }
 
-    // draw main camera
+    // draw robot camera to camera frame
     QImage imgIn = QImage((uchar*) robotPicture.data, robotPicture.cols, robotPicture.rows, robotPicture.step, QImage::Format_BGR888);
     painter.drawImage(cameraRect ,imgIn,imgIn.rect());
 
-    int column_start = 1000;
-    int row_start    = 1000;
-    int column_end   = 0;
-    int row_end      = 0;
+    // main frame drawing
+    // first, loop over map and set TOP_LEFT and BOTTOM_RIGHT of filled map coordinates for resizing map to max zoom level
+    column_start = 1000;
+    row_start    = 1000;
+    column_end   = 0;
+    row_end      = 0;
     for (int i = 0; i < MAP_HEIGHT; ++i)
     {
         for (int j = 0; j < MAP_WIDTH; ++j)
@@ -357,6 +381,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
         }
     }
 
+    // draw map to main frame
     if (map.filled)
     {
         for (int i = 0; i < MAP_HEIGHT; ++i)
@@ -369,34 +394,36 @@ void MainWindow::paintEvent(QPaintEvent *event)
                     float point_y = mainRect.topLeft().y() + ((i-row_start + 3) * mainHeight)   / (row_end-row_start + 6);
 
                     if(!((point_y < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (point_x < mainWidth/40 + (mainHeight/70.0) * 25)))
-                        painter.drawEllipse(QPointF(point_x, point_y), 2 * (mainWidth/mainBaseSize.x), 2 * (mainHeight/mainBaseSize.y));
+                        painter.drawEllipse(QPointF(point_x + width_offset, point_y + height_offset), 2 * (mainWidth/mainBaseSize.x), 2 * (mainHeight/mainBaseSize.y));
                 }
             }
         }
     }
 
+    // draw robot to main frame
     float robot_x = x * MAP_STEP + MAP_WIDTH  / 2.0f;
     float robot_y = MAP_HEIGHT - (y * MAP_STEP + MAP_HEIGHT / 2.0f);
 
-    float point_x = mainRect.topLeft().x() + ((robot_x - column_start + 3) * mainWidth) / (column_end - column_start + 6);
-    float point_y = mainRect.topLeft().y() + ((robot_y - row_start + 3) * mainHeight)   / (row_end-row_start + 6);
+    robot_x = mainRect.topLeft().x() + ((robot_x - column_start + 3) * mainWidth) / (column_end - column_start + 6);
+    robot_y = mainRect.topLeft().y() + ((robot_y - row_start + 3) * mainHeight)   / (row_end-row_start + 6);
 
-    if(!((point_y < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (point_x < mainWidth/40 + (mainHeight/70.0) * 25)))
+    if(!((robot_y < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (robot_x < mainWidth/40 + (mainHeight/70.0) * 25)))
     {
         painter.setBrush(QBrush(Qt::gray));
         painter.setPen(QPen(Qt::blue));
-        painter.drawEllipse(QPointF(point_x, point_y), 15.0 * (mainWidth/640.0), 15.0 * (mainHeight/480.0));
+        painter.drawEllipse(QPointF(robot_x + width_offset, robot_y + height_offset), 15.0 * (mainWidth/640.0), 15.0 * (mainHeight/480.0));
 
         float zooming_x = 5000.0 / mainWidth;
         float zooming_y = 5000.0 / mainHeight;
         float dist_x = 200.0 / zooming_x;
         float dist_y = 200.0 / zooming_y;
-        float xp_2   = point_x + dist_x * cos((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
-        float yp_2   = point_y + dist_y * sin((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
+        float xp_2   = robot_x + dist_x * cos((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
+        float yp_2   = robot_y + dist_y * sin((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
 
-        painter.drawLine(QLine(QPoint(point_x, point_y), QPoint(xp_2, yp_2)));
+        painter.drawLine(QLine(QPoint(robot_x + width_offset, robot_y + height_offset), QPoint(xp_2 + width_offset, yp_2 + height_offset)));
     }
 
+    // draw trajectory to main frame
     for (auto&& p : trajectory)
     {
         // make conversion from world coordinates to map frame coordinates
@@ -409,18 +436,46 @@ void MainWindow::paintEvent(QPaintEvent *event)
         // change color according to distance
         painter.setPen(QPen(Qt::blue));
         painter.setBrush(QBrush(Qt::blue));
-        painter.drawEllipse(QPointF(point_x, point_y), 1.4 * (mainWidth/640), 1.4 * (mainHeight/480));
+        painter.drawEllipse(QPointF(point_x + width_offset, point_y + height_offset), 1.4 * (mainWidth/640), 1.4 * (mainHeight/480));
     }
 
     // draw text to lidar frame
     painter.setPen(QPen(Qt::blue));
     painter.setFont(QFont("Times", (mainHeight/70.0), QFont::Bold));
     std::string message1 = "Trans. speed is: " + std::to_string(actualSpeed);
-    painter.drawText(QPoint(mainWidth/40, mainHeight/20), message1.c_str());
+    painter.drawText(QPoint(mainWidth/40 + width_offset, mainHeight/20 + height_offset), message1.c_str());
     std::string message2 = "Command send to robot: " + std::string(DirectionToString(direction));
-    painter.drawText(QPoint(mainWidth/40, mainHeight/20 + mainHeight/35), message2.c_str());
+    painter.drawText(QPoint(mainWidth/40 + width_offset, mainHeight/20 + mainHeight/35 + height_offset), message2.c_str());
+
+    // check for reachability and display text for 20 iterations
+    if (unreachable)
+    {
+        unreachable = false;
+        count = 0;
+
+    }
+    if (count < 20)
+       painter.drawText(QPoint(mainWidth/2 + width_offset, mainHeight/2 + height_offset), "Point is not reachable");
+
+
+    // drawing blackbars
+    if (width_offset != 0)
+    {
+        painter.setBrush(QBrush(Qt::black));
+        painter.setPen(QPen(Qt::black));
+        painter.drawRect(QRect(QPoint(0, mainRect.topLeft().y()), QPoint(width_offset, mainRect.bottomLeft().y())));
+        painter.drawRect(QRect(QPoint(mainRect.bottomRight().x() - width_offset, mainRect.topLeft().y()), QPoint(mainRect.bottomRight().x(), mainRect.bottomLeft().y())));
+    }
+    else
+    {
+        painter.setBrush(QBrush(Qt::black));
+        painter.setPen(QPen(Qt::black));
+        painter.drawRect(QRect(QPoint(0, mainRect.topLeft().y()), QPoint(mainRect.bottomRight().x(), height_offset)));
+        painter.drawRect(QRect(QPoint(0, mainRect.bottomLeft().y() - height_offset), QPoint(mainRect.bottomRight().x(), mainRect.bottomLeft().y())));
+    }
 }
 
+// key moving
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
     if(event->key() == Qt::Key_W)
@@ -449,15 +504,17 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
     }
 }
 
-// Implement in your widget
+// click navigating
 void MainWindow::mousePressEvent(QMouseEvent *event){
 
     QPoint p = event->pos();
+    Point target;
 
+    // if click was in lidar frame
     if (p.x() > mapRect.topLeft().x() && p.x() < mapRect.bottomRight().x() &&
         p.y() > mapRect.topLeft().y() && p.y() < mapRect.bottomRight().y() )
     {
-        // convert to mainFrame coordinates
+        // all computations needed to get world point coordinates of clicked point
         double tx = p.x() - mapRect.topLeft().x();
         double ty = p.y() - mapRect.topLeft().y();
 
@@ -471,9 +528,6 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
         // center point coordinates
         tx -= origWidth/2.0;
         ty -= originHeight/2.0;
-
-        // tx is distance in x axis to point in pixels
-        // ty is distance in y axis to point in pixels
 
         tx = (tx * 5000.0f) / origWidth;
         ty = (ty * 5000.0f) / originHeight;
@@ -491,57 +545,70 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
         double target_world_x = x + new_x;
         double target_world_y = y + new_y;
 
-        // now tx is distance in x axis to point in meters
-        // now ty is distance in y axis to point in meters
+        target = Point(target_world_x, target_world_y);
+    }
+    // if click was in main frame
+    else if (p.x() > mainRect.topLeft().x() + width_offset && p.x() < mainRect.bottomRight().x() - width_offset &&
+             p.y() > mainRect.topLeft().y() + height_offset && p.y() < mainRect.bottomRight().y() - height_offset)
+    {
+       // all computations needed to get world point coordinates of clicked point
+        double tx = p.x() - mainRect.topLeft().x() - width_offset;
+        double ty = p.y() - mainRect.topLeft().y() - height_offset;
 
-        // check with zone if point is reachable
-        Point target(target_world_x, target_world_y);
-        Point actual(x, y);
-        // ziskanie chyby polohy
-        auto targetOffset = GetTargetOffset(actual, target);
+        tx = (float)(tx * (column_end-column_start+6) - (3-column_start)*mainWidth) / mainWidth;
+        ty = (float)((ty) * (row_end-row_start+6) - (3-row_start)*mainHeight) / mainHeight;
 
-        bool unreachable = false;
-        for(int k=0;k<paintLaserData.numberOfScans;k++)
+        double target_world_x = (tx - MAP_WIDTH/2.0)/MAP_STEP;
+        double target_world_y = (MAP_HEIGHT - ty - MAP_HEIGHT/2.0)/MAP_STEP;
+
+        target = Point(target_world_x, target_world_y);
+    }
+
+    Point actual(x, y);
+
+    // get offcet from the target point
+    auto targetOffset = GetTargetOffset(actual, target);
+
+    // checking for point reachability, with zone
+    unreachable = false;
+    for(int k=0;k<paintLaserData.numberOfScans;k++)
+    {
+        float D = paintLaserData.Data[k].scanDistance / 1000.0;
+        float a = 360.0 - paintLaserData.Data[k].scanAngle;
+        if (a > 360)    a -= 360;
+        if (a < 0)      a += 360;
+        float pointAngleZone = DegreeToRad(a) - targetOffset.second;
+
+        if (D > 0.005 && D < targetOffset.first && (pointAngleZone < PI/2 || pointAngleZone > (3/2)*PI) )
         {
-            float D = paintLaserData.Data[k].scanDistance / 1000.0;
-            float a = 360.0 - paintLaserData.Data[k].scanAngle;
-            if (a > 360)    a -= 360;
-            if (a < 0)      a += 360;
-            float pointAngleZone = DegreeToRad(a) - targetOffset.second;
-
-            if (D > 0.005 && D < targetOffset.first && (pointAngleZone < PI/2 || pointAngleZone > (3/2)*PI) )
+            float dCrit = b / sin(pointAngleZone);
+            if (dCrit > D)
             {
-                float dCrit = b / sin(pointAngleZone);
-                if (dCrit > D)
-                {
-                    unreachable = true;
-                    break;
-                }
+                unreachable = true;
+                break;
             }
         }
+    }
 
-        std::cout << "Point is: [" << target_world_x << ", " << target_world_y << "]. " << std::endl;
+    // console logging
+    std::cout << "Point is: [" << target.x << ", " << target.y << "]. " << std::endl;
 
-        if (unreachable)
-            std::cout << "Point is unreachable!" << std::endl;
-        else
-        {
-            std::cout << "Point is reachable!" << std::endl;
-            // add to queue
-            fifoTargets.In(Point(target_world_x, target_world_y));
+    // if point is reachable, add it to queue and turn on navigation
+    if (unreachable)
+        std::cout << "Point is unreachable!" << std::endl;
+    else
+    {
+        std::cout << "Point is reachable!" << std::endl;
 
-            // turn on navigation
-            navigate = true;
-        }
+        // add to queue
+        fifoTargets.In(Point(target.x, target.y));
+
+        // turn on navigation
+        navigate = true;
     }
 }
 
-void MainWindow::resizeEvent(QResizeEvent* event)
-{
-
-
-}
-
+// function for manipulating with translation speed
 void MainWindow::RobotSetTranslationSpeed(float speed)
 {
     if (speed > 0.0)        direction = FORWARD;
@@ -557,6 +624,7 @@ void MainWindow::RobotSetTranslationSpeed(float speed)
     }
 }
 
+// function for manipulating with rotation speed
 void MainWindow::RobotSetRotationSpeed(float speed)
 {
     if (speed > 0.0)        direction = LEFT;
@@ -570,23 +638,21 @@ void MainWindow::RobotSetRotationSpeed(float speed)
     }
 }
 
+// function for getting offset between robot and target point
 std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target)
 {
     float dx = target.x - actual.x;
     float dy = target.y - actual.y;
     double alfa;
 
-    // ak je zmena v osi y nulova
     if (dy == 0.0f)
     {
         alfa = 0.0f;
     }
-    //ak je zmena v osi x nulova
     else if (dx == 0.0f)
     {
         alfa = PI/2.0f;
     }
-    // ak ani jeden predosli pripad nenastal, je delenie bezpecne
     else
     {
         alfa = atan(fabs(dy)/fabs(dx));
@@ -595,19 +661,19 @@ std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target
     bool negativeX =  dx < 0.0f;
     bool negativeY =  dy < 0.0f;
 
-    // umiestnenie uhla do spravneho kvadrantu -> theta e <0, 360>
+    // theta positioning to it's quadrant
 
-    // 2. kvadrant
+    // 2. quadrant
     if (negativeX && !negativeY)
     {
         alfa = PI - alfa;
     }
-    // 3. kvadrant
+    // 3. quadrant
     else if (negativeX && negativeY)
     {
        alfa = alfa + PI;
     }
-    // 4. kvadrant
+    // 4. quadrant
     else if (!negativeX && negativeY)
     {
        alfa = 2*PI - alfa;
@@ -642,10 +708,10 @@ std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target
 
 void MainWindow::RegulatorRotation(double dTheta)
 {
-    // ak je uhol vacsi ako mrtve pasmo pa2, regulator reguluje uhol natocenia
+    // if angle is greater then dead zone pa2, regulator is regulating angle of robot
     if (fabs(dTheta) > pa2)
     {
-        // P Regulator s rampou
+        // P Regulator with ramp
         float idealSpeed = P_angle * dTheta;
         if (idealSpeed > prevRotSpeed + speedDifferenceLimit)
             rotSpeed += speedDifferenceLimit;
@@ -653,12 +719,13 @@ void MainWindow::RegulatorRotation(double dTheta)
             rotSpeed = idealSpeed;
     }
 
-    // ak je uhol mansie ako vnutorne mrtve pasmo pa1, ukoncujeme regulaciu uhla natocenia
+     // if angle is smaller then dead zone pa1, regulator is ending regulating angle of robot
     else if (fabs(dTheta) < pa1)
     {
        rotSpeed = 0.0f;
     }
 
+    // speed limitation
     if (rotSpeed > speedLimit)
         rotSpeed = speedLimit;
 
@@ -668,7 +735,7 @@ void MainWindow::RegulatorRotation(double dTheta)
 
 void MainWindow::RegulatorTranslation(double distance, double dTheta)
 {
-    // ak je robot spravne natoceny a neprebieha rotacia, regulator reguluje doprednu rychlost
+     // if robot has correct angle for target and the rotation is false, regulator is regulating foraward movement
     if (distance > pd && abs(dTheta) <= pa2)
     {
         float idealSpeed = P_distance * distance;
@@ -691,15 +758,13 @@ void MainWindow::EvaluateRegulation(double distance, double theta)
 {
     if (distance <= pd)
     {
-        // dosiahnutie ciela
+        // finished
         transSpeed = 0.0f;
         rotSpeed   = 0.0f;
-
-        // tato funkcia nastavi 0 rychlost na obe kolesa
         RobotSetTranslationSpeed(transSpeed);
-
         fifoTargets.Pop();
 
+        // turn off navigation
         if (fifoTargets.GetPoints().empty())
         {
             navigate = false;
@@ -707,6 +772,8 @@ void MainWindow::EvaluateRegulation(double distance, double theta)
         }
     }
 }
+
+// utillity functions
 
 double MainWindow::RadToDegree(double radians)
 {
