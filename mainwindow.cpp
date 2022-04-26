@@ -337,8 +337,8 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
             // drawing robot direction as set of lines
             float xp_2 = xp + 0.0f * (mapWidth/640.0); float yp_2 = yp - 10.0f * (mapHeight/480.0);
+             painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
             xp -= 6.0 * (mapWidth/640.0); xp_2 = xp + 12.0 * (mapHeight/640.0); yp_2 = yp;
-            painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
             painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
             draw_robot = false;
         }
@@ -398,30 +398,31 @@ void MainWindow::paintEvent(QPaintEvent *event)
                 }
             }
         }
+
+        // draw robot to main frame
+        float robot_x = x * MAP_STEP + MAP_WIDTH  / 2.0f;
+        float robot_y = MAP_HEIGHT - (y * MAP_STEP + MAP_HEIGHT / 2.0f);
+
+        robot_x = mainRect.topLeft().x() + ((robot_x - column_start + 3) * mainWidth) / (column_end - column_start + 6);
+        robot_y = mainRect.topLeft().y() + ((robot_y - row_start + 3) * mainHeight)   / (row_end-row_start + 6);
+
+        if(!((robot_y < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (robot_x < mainWidth/40 + (mainHeight/70.0) * 25)))
+        {
+            painter.setBrush(QBrush(Qt::gray));
+            painter.setPen(QPen(Qt::blue));
+            painter.drawEllipse(QPointF(robot_x + width_offset, robot_y + height_offset), 15.0 * (mainWidth/640.0), 15.0 * (mainHeight/480.0));
+
+            float zooming_x = 5000.0 / mainWidth;
+            float zooming_y = 5000.0 / mainHeight;
+            float dist_x = 200.0 / zooming_x;
+            float dist_y = 200.0 / zooming_y;
+            float xp_2   = robot_x + dist_x * cos((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
+            float yp_2   = robot_y + dist_y * sin((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
+
+            painter.drawLine(QLine(QPoint(robot_x + width_offset, robot_y + height_offset), QPoint(xp_2 + width_offset, yp_2 + height_offset)));
+        }
     }
 
-    // draw robot to main frame
-    float robot_x = x * MAP_STEP + MAP_WIDTH  / 2.0f;
-    float robot_y = MAP_HEIGHT - (y * MAP_STEP + MAP_HEIGHT / 2.0f);
-
-    robot_x = mainRect.topLeft().x() + ((robot_x - column_start + 3) * mainWidth) / (column_end - column_start + 6);
-    robot_y = mainRect.topLeft().y() + ((robot_y - row_start + 3) * mainHeight)   / (row_end-row_start + 6);
-
-    if(!((robot_y < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (robot_x < mainWidth/40 + (mainHeight/70.0) * 25)))
-    {
-        painter.setBrush(QBrush(Qt::gray));
-        painter.setPen(QPen(Qt::blue));
-        painter.drawEllipse(QPointF(robot_x + width_offset, robot_y + height_offset), 15.0 * (mainWidth/640.0), 15.0 * (mainHeight/480.0));
-
-        float zooming_x = 5000.0 / mainWidth;
-        float zooming_y = 5000.0 / mainHeight;
-        float dist_x = 200.0 / zooming_x;
-        float dist_y = 200.0 / zooming_y;
-        float xp_2   = robot_x + dist_x * cos((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
-        float yp_2   = robot_y + dist_y * sin((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
-
-        painter.drawLine(QLine(QPoint(robot_x + width_offset, robot_y + height_offset), QPoint(xp_2 + width_offset, yp_2 + height_offset)));
-    }
 
     // draw trajectory to main frame
     for (auto&& p : trajectory)
@@ -463,15 +464,15 @@ void MainWindow::paintEvent(QPaintEvent *event)
     {
         painter.setBrush(QBrush(Qt::black));
         painter.setPen(QPen(Qt::black));
-        painter.drawRect(QRect(QPoint(0, mainRect.topLeft().y()), QPoint(width_offset, mainRect.bottomLeft().y())));
+        painter.drawRect(QRect(QPoint(mainRect.topLeft().x(), mainRect.topLeft().y()), QPoint(width_offset, mainRect.bottomLeft().y())));
         painter.drawRect(QRect(QPoint(mainRect.bottomRight().x() - width_offset, mainRect.topLeft().y()), QPoint(mainRect.bottomRight().x(), mainRect.bottomLeft().y())));
     }
     else
     {
         painter.setBrush(QBrush(Qt::black));
         painter.setPen(QPen(Qt::black));
-        painter.drawRect(QRect(QPoint(0, mainRect.topLeft().y()), QPoint(mainRect.bottomRight().x(), height_offset)));
-        painter.drawRect(QRect(QPoint(0, mainRect.bottomLeft().y() - height_offset), QPoint(mainRect.bottomRight().x(), mainRect.bottomLeft().y())));
+        painter.drawRect(QRect(QPoint(mainRect.topLeft().x(), mainRect.topLeft().y()), QPoint(mainRect.bottomRight().x(), mainRect.topLeft().y() + height_offset)));
+        painter.drawRect(QRect(QPoint(mainRect.topLeft().x(), mainRect.bottomLeft().y() - height_offset), QPoint(mainRect.bottomRight().x(), mainRect.bottomLeft().y())));
     }
 }
 
