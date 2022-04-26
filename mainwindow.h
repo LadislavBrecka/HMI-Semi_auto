@@ -42,7 +42,7 @@
 #define ROBOT_STOP 0x00
 #define ROBOT_ARC 0x05
 
-#define MAX_SPEED_LIMIT 400
+#define MAX_SPEED_LIMIT 200
 #define MAX_START_SPEED 50
 
 typedef struct
@@ -303,6 +303,9 @@ public:
     int mainWidth;
     int mainHeight;
 
+    int mapWidth;
+    int mapHeight;
+
     Direction direction = STOP;
 
     // utility funkcie
@@ -322,9 +325,9 @@ public:
     // switche
     bool initParam = true;
     bool navigate = false;
-    bool map_mode = false;
+    bool map_mode = true;
+    bool traj_mode = true;
     bool isRotating = false;
-    bool maping_nav = false;
 
     // signalizacie
     bool rotationLock;
@@ -454,7 +457,7 @@ public:
 
 private slots:
 
-    void on_mapButton_clicked(bool checked);
+    void on_trajButton_clicked(bool checked);
     void on_saveMap_clicked(bool checked);
     void on_safeStop_clicked(bool checked);
 
@@ -466,6 +469,7 @@ private:
     bool applyDelay;
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 };
 
 #endif // MAINWINDOW_H

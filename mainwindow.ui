@@ -88,7 +88,7 @@
          <number>15</number>
         </property>
         <item row="0" column="0">
-         <widget class="QRadioButton" name="mapButton">
+         <widget class="QRadioButton" name="trajButton">
           <property name="layoutDirection">
            <enum>Qt::LeftToRight</enum>
           </property>
@@ -96,7 +96,10 @@
            <bool>false</bool>
           </property>
           <property name="text">
-           <string>Mapping Mode</string>
+           <string>Trajectory mode</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
           </property>
          </widget>
         </item>

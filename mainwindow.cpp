@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     showCamera=false;
     showLidar=true;
     showSkeleton=false;
-    applyDelay=true;
+    applyDelay=false;
 
     dl=0;
     stopall=1;
@@ -164,11 +164,10 @@ void MainWindow::localrobot(TKobukiData &sens)
                 map.setWall(Point(x_lidar, y_lidar));
             }
         }
-
-        float rounded_x = (int)(x * 100 + .5); rounded_x = (float)rounded_x / 100;
-        float rounded_y = (int)(y * 100 + .5); rounded_y = (float)rounded_y / 100;
-        trajectory.insert(std::make_unique<Point>(rounded_x, rounded_y));
     }
+
+    if (traj_mode)
+        trajectory.insert(std::make_unique<Point>(x, y));
 
     if (l_r != l_l)
         isRotating = true;
@@ -187,8 +186,8 @@ void MainWindow::paintEvent(QPaintEvent *event)
     pero.setColor(Qt::green);
 
     mainRect   = ui->mainFrame->geometry();
-    cameraRect = ui->cameraFrame->geometry();
     mapRect    = ui->mapFrame->geometry();
+    cameraRect = ui->cameraFrame->geometry();
 
     painter.drawRect(mainRect);
     painter.setBrush(Qt::white);
@@ -199,10 +198,13 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
     painter.setBrush(Qt::black);
 
-
     mainWidth  = mainRect.bottomRight().x() - mainRect.topLeft().x();
     mainHeight = mainRect.bottomRight().y() - mainRect.topLeft().y();
 
+    mapWidth  = mapRect.bottomRight().x() - mapRect.topLeft().x();
+    mapHeight = mapRect.bottomRight().y() - mapRect.topLeft().y();
+
+    Point mainBaseSize(732,539);
     // draw lidar integration
     painter.setPen(pero);
 
@@ -291,27 +293,27 @@ void MainWindow::paintEvent(QPaintEvent *event)
         }
 
         // computing x and y for standalone lidar frame
-        float zooming_x = 5000.0 / mainWidth;
-        float zooming_y = 5000.0 / mainHeight;
+        float zooming_x = 5000.0 / mapWidth;
+        float zooming_y = 5000.0 / mapHeight;
         float dist_x = paintLaserData.Data[k].scanDistance / zooming_x;
         float dist_y = paintLaserData.Data[k].scanDistance / zooming_y;
-        float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + dist_x * sin((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
-        float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + dist_y * cos((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
+        float xp   = mapRect.bottomRight().x() - (mapWidth  / 2.0 + dist_x * sin((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
+        float yp   = mapRect.bottomRight().y() - (mapHeight / 2.0 + dist_y * cos((360.0 - paintLaserData.Data[k].scanAngle) * 3.14159 / 180.0));
 
         if (draw_robot)
         {
-            float xp   = mainRect.bottomRight().x() - (mainWidth  / 2.0 + 1.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
-            float yp   = mainRect.bottomRight().y() - (mainHeight / 2.0 + 1.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
+            float xp   = mapRect.bottomRight().x() - (mapWidth  / 2.0 + 1.0 * sin((360.0 - 0.0) * 3.14159 / 180.0));
+            float yp   = mapRect.bottomRight().y() - (mapHeight / 2.0 + 1.0 * cos((360.0 - 0.0) * 3.14159 / 180.0));
 
             painter.setPen(QPen(Qt::blue));
-            painter.drawEllipse(QPointF(xp, yp), 6.0 * (mainWidth/640.0), 6.0 * (mainHeight/480.0));
+            painter.drawEllipse(QPointF(xp, yp), 6.0 * (mapWidth/640.0), 6.0 * (mapHeight/480.0));
 
-            float xp_2 = xp + 0.0f * (mainWidth/640.0);
-            float yp_2 = yp - 10.0f * (mainHeight/480.0);
+            float xp_2 = xp + 0.0f * (mapWidth/640.0);
+            float yp_2 = yp - 10.0f * (mapHeight/480.0);
             painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
 
-            xp -= 6.0 * (mainWidth/640.0);
-            xp_2 = xp + 12.0 * (mainWidth/640.0);
+            xp -= 6.0 * (mapWidth/640.0);
+            xp_2 = xp + 12.0 * (mapHeight/640.0);
             yp_2 = yp;
             painter.drawLine(QLine(QPoint(xp, yp), QPoint(xp_2, yp_2)));
 
@@ -319,15 +321,12 @@ void MainWindow::paintEvent(QPaintEvent *event)
         }
 
         // painting lidar points to standalone frame
-        if(xp < mainRect.bottomRight().x() && xp > mainRect.topLeft().x() &&
-           yp < mainRect.bottomRight().y() && yp > mainRect.topLeft().y() &&
-           !((yp < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (xp < mainWidth/40 + (mainHeight/70.0) * 25))
-
-          )
+        if(xp < mapRect.bottomRight().x() && xp > mapRect.topLeft().x() &&
+           yp < mapRect.bottomRight().y() && yp > mapRect.topLeft().y())
         {
             // change color according to distance
             painter.setPen(QPen(Qt::gray));
-            painter.drawEllipse(QPointF(xp, yp), 2.0 * (mainWidth/640.0), 2.0 * (mainHeight/480.0));
+            painter.drawEllipse(QPointF(xp, yp), 2.0 * (mapWidth/640.0), 2.0 * (mapHeight/480.0));
         }
     }
 
@@ -335,9 +334,29 @@ void MainWindow::paintEvent(QPaintEvent *event)
     QImage imgIn = QImage((uchar*) robotPicture.data, robotPicture.cols, robotPicture.rows, robotPicture.step, QImage::Format_BGR888);
     painter.drawImage(cameraRect ,imgIn,imgIn.rect());
 
-    // draw map
-    double mapRectWidth  = mapRect.bottomRight().x() - mapRect.topLeft().x();
-    double mapRectHeight = mapRect.bottomRight().y() - mapRect.topLeft().y();
+    int column_start = 1000;
+    int row_start    = 1000;
+    int column_end   = 0;
+    int row_end      = 0;
+    for (int i = 0; i < MAP_HEIGHT; ++i)
+    {
+        for (int j = 0; j < MAP_WIDTH; ++j)
+        {
+            if (map.map[i][j] == 1)
+            {
+                if (j < column_start)
+                    column_start = j;
+                if (i < row_start)
+                    row_start = i;
+
+                if (j > column_end)
+                    column_end = j;
+                if (i > row_end)
+                    row_end = i;
+            }
+        }
+    }
+
     if (map.filled)
     {
         for (int i = 0; i < MAP_HEIGHT; ++i)
@@ -346,29 +365,51 @@ void MainWindow::paintEvent(QPaintEvent *event)
             {
                 if (map.map[i][j] == 1)
                 {
-                    float point_x = mapRect.topLeft().x() + (j * mapRectWidth)  / MAP_WIDTH;
-                    float point_y = mapRect.topLeft().y() + (i * mapRectHeight) / MAP_HEIGHT;
+                    float point_x = mainRect.topLeft().x() + ((j-column_start + 3) * mainWidth) / (column_end - column_start + 6);
+                    float point_y = mainRect.topLeft().y() + ((i-row_start + 3) * mainHeight)   / (row_end-row_start + 6);
 
-                    painter.drawEllipse(QPointF(point_x, point_y), 2 * (mapRectWidth/500), 2 * (mapRectHeight/500));
-
+                    if(!((point_y < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (point_x < mainWidth/40 + (mainHeight/70.0) * 25)))
+                        painter.drawEllipse(QPointF(point_x, point_y), 2 * (mainWidth/mainBaseSize.x), 2 * (mainHeight/mainBaseSize.y));
                 }
             }
         }
     }
 
+    float robot_x = x * MAP_STEP + MAP_WIDTH  / 2.0f;
+    float robot_y = MAP_HEIGHT - (y * MAP_STEP + MAP_HEIGHT / 2.0f);
+
+    float point_x = mainRect.topLeft().x() + ((robot_x - column_start + 3) * mainWidth) / (column_end - column_start + 6);
+    float point_y = mainRect.topLeft().y() + ((robot_y - row_start + 3) * mainHeight)   / (row_end-row_start + 6);
+
+    if(!((point_y < mainHeight/20 + mainHeight/35 + mainHeight/70.0 + 15) && (point_x < mainWidth/40 + (mainHeight/70.0) * 25)))
+    {
+        painter.setBrush(QBrush(Qt::gray));
+        painter.setPen(QPen(Qt::blue));
+        painter.drawEllipse(QPointF(point_x, point_y), 15.0 * (mainWidth/640.0), 15.0 * (mainHeight/480.0));
+
+        float zooming_x = 5000.0 / mainWidth;
+        float zooming_y = 5000.0 / mainHeight;
+        float dist_x = 200.0 / zooming_x;
+        float dist_y = 200.0 / zooming_y;
+        float xp_2   = point_x + dist_x * cos((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
+        float yp_2   = point_y + dist_y * sin((360.0 - RadToDegree(f_k)) * 3.14159 / 180.0);
+
+        painter.drawLine(QLine(QPoint(point_x, point_y), QPoint(xp_2, yp_2)));
+    }
+
     for (auto&& p : trajectory)
     {
         // make conversion from world coordinates to map frame coordinates
-        int traj_x = round(p->x * MAP_STEP + MAP_WIDTH  / 2);
-        int traj_y = MAP_HEIGHT - round(p->y * MAP_STEP + MAP_HEIGHT / 2);
+        float traj_x = p->x * MAP_STEP + MAP_WIDTH  / 2.0f;
+        float traj_y = MAP_HEIGHT - (p->y * MAP_STEP + MAP_HEIGHT / 2.0f);
 
-        float point_x = mapRect.topLeft().x() + (traj_x * mapRectWidth)  / MAP_WIDTH;
-        float point_y = mapRect.topLeft().y() + (traj_y * mapRectHeight) / MAP_HEIGHT;
+        float point_x = mainRect.topLeft().x() + ((traj_x-column_start + 3.0f) * mainWidth) / (float)(column_end - column_start + 6.0f);
+        float point_y = mainRect.topLeft().y() + ((traj_y-row_start + 3.0f) * mainHeight)   / (float)(row_end-row_start + 6.0f);
 
         // change color according to distance
-        painter.setPen(QPen(Qt::green));
-        painter.setBrush(QBrush(Qt::green));
-        painter.drawEllipse(QPointF(point_x, point_y), 1.4 * (mapRectWidth/500), 1.4 * (mapRectHeight/500));
+        painter.setPen(QPen(Qt::blue));
+        painter.setBrush(QBrush(Qt::blue));
+        painter.drawEllipse(QPointF(point_x, point_y), 1.4 * (mainWidth/640), 1.4 * (mainHeight/480));
     }
 
     // draw text to lidar frame
@@ -384,12 +425,12 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 {
     if(event->key() == Qt::Key_W)
     {
-        RobotSetTranslationSpeed(350.0f);
+        RobotSetTranslationSpeed(MAX_SPEED_LIMIT);
     }
 
     if(event->key() == Qt::Key_A)
     {
-        RobotSetRotationSpeed(PI/4.0f);
+        RobotSetRotationSpeed(PI/8.0f);
     }
 
     if(event->key() == Qt::Key_S)
@@ -399,12 +440,12 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 
     if(event->key() == Qt::Key_D)
     {
-        RobotSetRotationSpeed(-PI/4.0f);
+        RobotSetRotationSpeed(-PI/8.0f);
     }
 
     if(event->key() == Qt::Key_X)
     {
-        RobotSetTranslationSpeed(-350.0f);
+        RobotSetTranslationSpeed(MAX_SPEED_LIMIT);
     }
 }
 
@@ -413,29 +454,29 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
 
     QPoint p = event->pos();
 
-    mainWidth  = mainRect.bottomRight().x() - mainRect.topLeft().x();
-    mainHeight = mainRect.bottomRight().y() - mainRect.topLeft().y();
-
-    if (p.x() > mainRect.topLeft().x() && p.x() < mainRect.bottomRight().x() &&
-        p.y() > mainRect.topLeft().y() && p.y() < mainRect.bottomRight().y() )
+    if (p.x() > mapRect.topLeft().x() && p.x() < mapRect.bottomRight().x() &&
+        p.y() > mapRect.topLeft().y() && p.y() < mapRect.bottomRight().y() )
     {
         // convert to mainFrame coordinates
-        double tx = p.x() - mainRect.topLeft().x();
-        double ty = p.y() - mainRect.topLeft().y();
+        double tx = p.x() - mapRect.topLeft().x();
+        double ty = p.y() - mapRect.topLeft().y();
 
-        // cast to 640x480
-        tx = (tx * 640.0) / mainWidth;
-        ty = 480.0 - (ty * 480.0) / mainHeight;
+        double origWidth = 242.0;
+        double originHeight = 127.0;
+
+        // cast to 242x127
+        tx = (tx * origWidth) / mapWidth;
+        ty = originHeight - (ty * originHeight) / mapHeight;
 
         // center point coordinates
-        tx -= 640.0/2.0;
-        ty -= 480.0/2.0;
+        tx -= origWidth/2.0;
+        ty -= originHeight/2.0;
 
         // tx is distance in x axis to point in pixels
         // ty is distance in y axis to point in pixels
 
-        tx = (tx * 5000.0f) / 640.0;
-        ty = (ty * 5000.0f) / 480.0;
+        tx = (tx * 5000.0f) / origWidth;
+        ty = (ty * 5000.0f) / originHeight;
         tx /= 1000.0f;
         ty /= 1000.0f;
 
@@ -495,6 +536,12 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
     }
 }
 
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+
+
+}
+
 void MainWindow::RobotSetTranslationSpeed(float speed)
 {
     if (speed > 0.0)        direction = FORWARD;
@@ -549,6 +596,7 @@ std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target
     bool negativeY =  dy < 0.0f;
 
     // umiestnenie uhla do spravneho kvadrantu -> theta e <0, 360>
+
     // 2. kvadrant
     if (negativeX && !negativeY)
     {
@@ -654,7 +702,6 @@ void MainWindow::EvaluateRegulation(double distance, double theta)
 
         if (fifoTargets.GetPoints().empty())
         {
-
             navigate = false;
             std::cout << std::endl << "Point reached!" << std::endl;
         }
@@ -686,26 +733,26 @@ void MainWindow::PrintTargetQueue()
     std::cout << message << std::endl;
 }
 
-void MainWindow::on_mapButton_clicked(bool checked)
+void MainWindow::on_trajButton_clicked(bool checked)
 {
-    if (checked)
-    {
-        speedLimit = 150.0f;
-        speedDifferenceLimit = 25.0;
-        map_mode = true;
-    }
-    else
-    {
-        map_mode = false;
-        speedLimit = MAX_SPEED_LIMIT;
-        speedDifferenceLimit = MAX_START_SPEED;
-    }
+    traj_mode = checked;
 }
 
 void MainWindow::on_saveMap_clicked(bool checked)
 {
     map.saveToFile();
 }
+
+void MainWindow::on_safeStop_clicked(bool checked)
+{
+    RobotSetTranslationSpeed(0.0f);
+}
+
+
+
+
+
+
 
 
 //--cokolvek za tymto vas teoreticky nemusi zaujimat, su tam len nejake skarede kody
@@ -1173,41 +1220,30 @@ void MainWindow::imageViewer()
             struct timespec t;
             CameraVector newcommand;
             frameBuf.copyTo(newcommand.data);
-            //    clock_gettime(CLOCK_REALTIME,&t);
-            newcommand.timestamp=std::chrono::steady_clock::now();//(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
-            auto timestamp=std::chrono::steady_clock::now();//(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
+            // clock_gettime(CLOCK_REALTIME,&t);
+            newcommand.timestamp=std::chrono::steady_clock::now();  //(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
+            auto timestamp=std::chrono::steady_clock::now();        //(int64_t)(t.tv_sec) * (int64_t)1000000000 + (int64_t)(t.tv_nsec);
             cameraQuerry.push_back(newcommand);
             for(int i=0;i<cameraQuerry.size();i++)
             {
                 if((std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp-cameraQuerry[i].timestamp)).count()>(2.5*1000000000))
                 {
-
                     cameraQuerry[i].data.copyTo(robotPicture);
                     cameraQuerry.erase(cameraQuerry.begin()+i);
                     i--;
                     break;
-
                 }
             }
-
         }
         else
         {
-
-
            frameBuf.copyTo(robotPicture);
         }
         frameBuf.copyTo(AutonomousrobotPicture);
         updateCameraPicture=1;
-
         update();
         cv::waitKey(1);
         QCoreApplication::processEvents();
     }
-}
-
-void MainWindow::on_safeStop_clicked(bool checked)
-{
-    RobotSetTranslationSpeed(0.0f);
 }
 
