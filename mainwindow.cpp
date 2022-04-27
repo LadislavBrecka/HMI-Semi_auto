@@ -781,6 +781,7 @@ void MainWindow::on_saveMap_clicked(bool checked)
 
 void MainWindow::on_safeStop_clicked(bool checked)
 {
+    fifoTargets.Pop();
     RobotSetTranslationSpeed(0.0f);
 }
 
