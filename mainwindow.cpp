@@ -62,22 +62,6 @@ void MainWindow::localrobot(TKobukiData &sens)
         f_k_prev = 0.0f;
         x_prev = 0.0f;
         y_prev = 0.0f;
-        total_l = 0.0f;
-        total_r = 0.0f;
-
-        pa1 = 0.06;
-        pa2 = 0.12;
-        pd = 0.035f;
-
-        // regulator setup
-        P_distance = 200.0f;
-        P_angle = 0.25f;
-        speedDifferenceLimit = MAX_START_SPEED;
-        speedLimit = MAX_SPEED_LIMIT;
-
-        // prevision values setup
-        prevRotSpeed = rotSpeed = 0.0f;
-        prevTransSpeed = transSpeed = 0.0f;
 
         initParam = false;
     }
@@ -124,21 +108,10 @@ void MainWindow::localrobot(TKobukiData &sens)
     x_prev = x;
     y_prev = y;
 
-    // REGULATION
-    if (!fifoTargets.GetPoints().empty() && (navigate || 0))
-    {
-        // first in, first out -> dat mi prvy element zo zasobnika
-        Point target = fifoTargets.Out();
-        Point actual(x, y);
-        // ziskanie chyby polohy
-        auto targetOffset = GetTargetOffset(actual, target);
-        // regulacia rotacie
-        RegulatorRotation(targetOffset.second);
-        // ak nerotujeme, regulujeme doprednu rychlost
-        RegulatorTranslation(targetOffset.first, targetOffset.second);
-        // vyhodnotenie, ci splname poziadavky polohy
-        EvaluateRegulation(targetOffset.first, targetOffset.second);
-    }
+    if (l_r!= l_l)
+        isRotating = true;
+    else
+        isRotating = false;
 
     // CREATING MAP
     if (!isRotating && map_mode)
@@ -168,11 +141,6 @@ void MainWindow::localrobot(TKobukiData &sens)
 
     if (traj_mode)
         trajectory.insert(std::make_unique<Point>(x, y));
-
-    if (l_r != l_l)
-        isRotating = true;
-    else
-        isRotating = false;
 }
 
 //sposob kreslenia na obrazovku, tento event sa spusti vzdy ked sa bud zavola funkcia update() alebo operacny system si vyziada prekreslenie okna
@@ -456,7 +424,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
     }
     if (count < 20)
-       painter.drawText(QPoint(mainWidth/2 + width_offset, mainHeight/2 + height_offset), "Point is not reachable");
+       painter.drawText(QPoint(mainWidth/2 + width_offset, mainHeight/2 + height_offset - mainHeight/30), "Point is not reachable");
 
 
     // drawing blackbars
@@ -568,7 +536,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event){
     Point actual(x, y);
 
     // get offcet from the target point
-    auto targetOffset = GetTargetOffset(actual, target);
+    auto targetOffset = GetTargetOffset(actual, target, f_k);
 
     // checking for point reachability, with zone
     unreachable = false;
@@ -640,7 +608,7 @@ void MainWindow::RobotSetRotationSpeed(float speed)
 }
 
 // function for getting offset between robot and target point
-std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target)
+std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target, float f_k_local)
 {
     float dx = target.x - actual.x;
     float dy = target.y - actual.y;
@@ -682,18 +650,18 @@ std::pair<double, double> MainWindow::GetTargetOffset(Point actual, Point target
 
     float distance = sqrt(pow(dx, 2) + pow(dy, 2));
     double thetaOffset = 0.0f;
-    if (f_k < alfa)
+    if (f_k_local < alfa)
     {
-        thetaOffset = alfa - f_k;
+        thetaOffset = alfa - f_k_local;
         if (thetaOffset > PI)
         {
             thetaOffset = 2*PI - thetaOffset;
             thetaOffset *= (-1);
         }
     }
-    else if (f_k > alfa)
+    else if (f_k_local > alfa)
     {
-        thetaOffset = f_k - alfa;
+        thetaOffset = f_k_local - alfa;
         if (thetaOffset <= PI)
         {
             thetaOffset *= (-1);
@@ -839,7 +807,95 @@ int MainWindow::locallaser(LaserMeasurement &laserData)
 void MainWindow::autonomousrobot(TKobukiData &sens)
 {
 
+    // inicializacia pri prvom spusteni
+    if (init_local)
+    {
+        // inicializacia mojich premennych
+        x_local = 0.0f;
+        y_local = 0.0f;
+
+        enc_l_prev_local = sens.EncoderLeft;
+        enc_r_prev_local = sens.EncoderRight;
+        f_k_prev_local = 0.0f;
+        x_prev_local = 0.0f;
+        y_prev_local = 0.0f;
+
+        pa1 = 0.012;
+        pa2 = 0.04;
+        pd = 0.02f;
+
+        // regulator setup
+        P_distance = 500.0f;
+        P_angle = 2.0f;
+        speedDifferenceLimit = MAX_START_SPEED;
+        speedLimit = MAX_SPEED_LIMIT;
+
+        // prevision values setup
+        prevRotSpeed = rotSpeed = 0.0f;
+        prevTransSpeed = transSpeed = 0.0f;
+
+        init_local = false;
+    }
+
+    // pridavok enkoderov oboch kolies
+    int enc_r_diff_local = sens.EncoderRight - enc_r_prev_local;
+    int enc_l_diff_local = sens.EncoderLeft - enc_l_prev_local;
+
+    // pretecenie praveho enkodera
+    if (enc_r_diff_local < -60000)
+        enc_r_diff_local = 65535 + enc_r_diff_local;
+    else if (enc_r_diff_local > 60000)
+        enc_r_diff_local = enc_r_diff_local - 65535;
+
+    // pretecenie laveho enkodera
+    if (enc_l_diff_local < -60000)
+        enc_l_diff_local = 65535 + enc_l_diff_local;
+    else if (enc_l_diff_local > 60000)
+        enc_l_diff_local = enc_l_diff_local - 65535;
+
+    // pridavok vzdialenosti oboch kolies
+    l_r_local = tickToMeter * (enc_r_diff_local);
+    l_l_local = tickToMeter * (enc_l_diff_local);
+
+    // vzdialenost l_k a uhol f_k
+    l_k_local = (l_r_local + l_l_local) / 2;
+    d_alfa_local = (l_r_local - l_l_local) / b;
+    f_k_local = f_k_prev_local + d_alfa_local;
+
+    // pretecenie uhla
+    if (f_k_local > 2*PI)
+        f_k_local -= 2*PI;
+    else if (f_k_local < 0.0f)
+        f_k_local += 2*PI;
+
+    // suradnice x a y
+    x_local = x_prev_local + l_k_local * cos(f_k_local);
+    y_local = y_prev_local + l_k_local * sin(f_k_local);
+
+    // ulozenie aktualnych do predoslych
+    enc_l_prev_local = sens.EncoderLeft;
+    enc_r_prev_local = sens.EncoderRight;
+    f_k_prev_local = f_k_local;
+    x_prev_local = x_local;
+    y_prev_local = y_local;
+
+    // REGULATION
+    if (!fifoTargets.GetPoints().empty() && navigate)
+    {
+        // first in, first out -> dat mi prvy element zo zasobnika
+        Point target = fifoTargets.Out();
+        Point actual(x_local, y_local);
+        // ziskanie chyby polohy
+        auto targetOffset = GetTargetOffset(actual, target, f_k_local);
+        // regulacia rotacie
+        RegulatorRotation(targetOffset.second);
+        // ak nerotujeme, regulujeme doprednu rychlost
+        RegulatorTranslation(targetOffset.first, targetOffset.second);
+        // vyhodnotenie, ci splname poziadavky polohy
+        EvaluateRegulation(targetOffset.first, targetOffset.second);
+    }
 }
+
 //--autonomouslaser simuluje spracovanie dat z robota, ktora bezi priamo na robote
 // predstavte si to tak,ze ste naprogramovali napriklad sposob obchadzania prekazky, uploadli ste ho do robota a tam sa to vykonava
 // dopravne oneskorenie nema vplyv na data

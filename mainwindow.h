@@ -42,7 +42,7 @@
 #define ROBOT_STOP 0x00
 #define ROBOT_ARC 0x05
 
-#define MAX_SPEED_LIMIT 200
+#define MAX_SPEED_LIMIT 250
 #define MAX_START_SPEED 50
 
 typedef struct
@@ -315,7 +315,7 @@ public:
     Direction direction = STOP;
 
     // utility funkcie
-    std::pair<double, double> GetTargetOffset(Point actual, Point target);
+    std::pair<double, double> GetTargetOffset(Point actual, Point target, float f_k_local);
     double RadToDegree(double radians);
     double DegreeToRad(double degrees);
     void   PrintTargetQueue();
@@ -330,24 +330,28 @@ public:
 
     // switche
     bool initParam = true;
+    bool init_local = true;
+
     bool navigate = false;
     bool map_mode = true;
     bool traj_mode = true;
+
     bool isRotating = false;
     bool unreachable = false;
 
     int count = 20;
 
-    // signalizacie
-    bool rotationLock;
-    int rotationDir;
-
     // lokalizacia - stavove premenne
-    double l_r, l_r_prev, l_l, l_l_prev, l_k;
+    double l_r, l_l, l_k;
     double x, x_prev, y, y_prev;
     double f_k, f_k_prev, d_alfa;
     unsigned int enc_l_prev, enc_r_prev;
-    double total_l, total_r;
+
+    // lokalizacia - stavove premenne na robote
+    double l_r_local, l_l_local, l_k_local;
+    double x_local, x_prev_local, y_local, y_prev_local;
+    double f_k_local, f_k_prev_local, d_alfa_local;
+    unsigned int enc_l_prev_local, enc_r_prev_local;
 
     // konstanty
     long const double tickToMeter = 0.000085292090497737556558; // [m/tick]
